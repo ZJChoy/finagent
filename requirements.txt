@@ -1,0 +1,27 @@
+# Web 框架
+fastapi
+uvicorn[standard]
+python-multipart
+
+# 配置
+python-dotenv
+
+# 数据库后端（默认 sqlite；用 mysql 时需要）
+PyMySQL
+
+# 云端模型（OpenAI 兼容：chat + embeddings）
+openai
+
+# PDF 解析
+pypdf
+pdfplumber
+
+# 数值计算
+numpy
+
+# 结构化财务数据
+akshare
+pandas
+
+# 评测配置
+pyyaml

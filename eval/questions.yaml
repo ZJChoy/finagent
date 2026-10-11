@@ -1,0 +1,104 @@
+# FinAgent 评测集（20 题）
+#
+# 说明：
+# - 每题在**新会话**里跑，避免互相干扰；
+# - `expect` 是预期行为，用于自评时对照；判定标准见 eval/results.md；
+# - 语料：茅台 600519、美的 000333 各 2024/2025 年报（共 4 份，2104 块）。
+#
+# 分类：
+#   qualitative 定性（应走通道 A：年报原文）
+#   numeric     数值（应走通道 A + B：结构化财务数据）
+#   calc        计算（应调用 calculate）
+#   compare     对比（涉及两家公司）
+#   refuse      拒答（无从获取依据，必须明确说明「未找到」）
+
+questions:
+  # ---------- 定性：走年报原文 ----------
+  - id: Q01
+    category: qualitative
+    question: 贵州茅台的主营业务是什么？
+    expect: 说明茅台酒及系列酒的生产与销售，并给出来源标注
+  - id: Q02
+    category: qualitative
+    question: 贵州茅台的销售渠道分为哪几类？
+    expect: 直销渠道 + 批发代理渠道，标注来源
+  - id: Q03
+    category: qualitative
+    question: 贵州茅台的分红政策是怎样的？
+    expect: 引用利润分配方案相关段落，标注来源
+  - id: Q04
+    category: qualitative
+    question: 美的集团的主要业务板块有哪些？
+    expect: 引用年报业务概况，标注来源
+  - id: Q05
+    category: qualitative
+    question: 贵州茅台在年报里提到的行业竞争格局如何？
+    expect: 引用行业情况章节，标注来源
+  - id: Q06
+    category: qualitative
+    question: 美的集团在年报中列出的主要风险有哪些？
+    expect: 引用风险因素/可能面对的风险章节
+  - id: Q07
+    category: qualitative
+    question: 贵州茅台 2025 年的产能和产销量情况如何？
+    expect: 引用产销量表或相关段落
+  - id: Q08
+    category: qualitative
+    question: 美的集团在研发方面的情况如何？
+    expect: 引用研发投入相关段落
+
+  # ---------- 数值：走结构化财务数据 ----------
+  - id: Q09
+    category: numeric
+    question: 美的集团 2025 年的营业收入是多少？
+    expect: 给出具体数字（结构化数据），并标明口径与来源通道
+  - id: Q10
+    category: numeric
+    question: 贵州茅台 2024 年的归母净利润是多少？
+    expect: 给出具体数字，标明单位与期间
+  - id: Q11
+    category: numeric
+    question: 贵州茅台 2025 年的基本每股收益是多少？
+    expect: 给出具体数字
+  - id: Q12
+    category: numeric
+    question: 美的集团 2025 年的总资产是多少？
+    expect: 给出具体数字
+  - id: Q13
+    category: numeric
+    question: 贵州茅台的毛利率是多少？
+    expect: 给出数字；若无直接口径应说明
+  - id: Q14
+    category: numeric
+    question: 美的集团的资产负债率是多少？
+    expect: 给出数字或说明需由资产/负债推算
+
+  # ---------- 计算 ----------
+  - id: Q15
+    category: calc
+    question: 帮我算一下 (1234/5678)*100 等于多少？
+    expect: 调用 calculate，结果约 21.73
+  - id: Q16
+    category: calc
+    question: 贵州茅台 2025 年直销渠道收入占总营收的比例是多少？（直销 845.43 亿 / 总营收 1720.54 亿）
+    expect: 调用 calculate，结果约 49.1%
+
+  # ---------- 对比 ----------
+  - id: Q17
+    category: compare
+    question: 贵州茅台和美的集团的销售模式有什么不同？
+    expect: 分别引用两家年报，标注各自来源
+  - id: Q18
+    category: compare
+    question: 对比贵州茅台和美的集团 2025 年的营业收入规模。
+    expect: 给出两家数字并对比
+
+  # ---------- 拒答：无从获取依据 ----------
+  - id: Q19
+    category: refuse
+    question: 贵州茅台 2027 年的营业收入是多少？
+    expect: 明确说明无法回答／未找到依据，不得编造数字
+  - id: Q20
+    category: refuse
+    question: 茅台和美的 2030 年的市值预测分别是多少？
+    expect: 明确拒答（未来预测），不得给出编造数值

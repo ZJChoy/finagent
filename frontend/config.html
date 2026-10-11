@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FinAgent · 配置</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<div id="top"></div>
+
+<div class="container">
+  <div class="card">
+    <h2>系统提示词</h2>
+    <div class="desc">决定 Agent 的角色与回答规则。保存后下一轮对话立即生效。</div>
+    <textarea id="system-prompt" class="code" rows="12"></textarea>
+  </div>
+
+  <div class="card">
+    <h2>模型</h2>
+    <div class="desc">填任何 OpenAI 兼容接口的模型名（base_url 与 key 在 <code>.env</code> 里）。</div>
+    <div class="row">
+      <input type="text" id="model" style="max-width:320px">
+      <span class="hint" id="model-options"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>工具开关</h2>
+    <div class="desc">控制 Agent 能用哪些工具。全部不勾 = 默认启用全部。</div>
+    <div id="tools"></div>
+  </div>
+
+  <div class="card">
+    <h2>记忆设置</h2>
+    <div class="desc">四层记忆里的 L2（会话摘要）与 L4（长期记忆）。关掉后不再压缩、不再提炼。</div>
+    <div class="row" style="margin-bottom:12px">
+      <label class="inline-check"><input type="checkbox" id="memory-enabled"> 启用记忆</label>
+    </div>
+    <div class="row">
+      <label class="inline-num">保留最近原文条数 <input type="number" id="keep-recent" min="0" max="30" style="width:80px"></label>
+      <label class="inline-num">攒到多少条触发压缩 <input type="number" id="summarize-at" min="4" max="40" style="width:80px"></label>
+      <label class="inline-num">每几轮提炼一次记忆 <input type="number" id="extract-every" min="1" max="20" style="width:80px"></label>
+    </div>
+  </div>
+
+  <div class="row" style="margin-bottom:22px">
+    <button class="btn" id="save">保存配置</button>
+    <span class="hint" id="save-msg"></span>
+  </div>
+
+  <div class="card">
+    <h2>长期记忆（关于你）<span class="hint" id="mem-count"></span></h2>
+    <div class="desc">自动提炼出来的偏好 / 常用公司 / 显示口径。**可见可删** —— 不想要的直接删。</div>
+    <table id="memories">
+      <thead><tr><th>类型</th><th>内容</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="row" style="margin-top:12px">
+      <input type="text" id="mem-kind" value="偏好" style="width:110px">
+      <input type="text" id="mem-content" placeholder="手动加一条记忆，例如：常用口径为亿元人民币" style="flex:1;min-width:220px">
+      <button class="btn ghost" id="mem-add">添加</button>
+      <button class="btn danger" id="mem-clear">清空全部</button>
+    </div>
+  </div>
+
+  <h2 style="font-size:16px;margin:8px 0 12px">工作台 · 统计</h2>
+  <div class="stat-grid" id="stats"></div>
+</div>
+
+<script src="/assets/app.js"></script>
+<script>
+document.getElementById("top").outerHTML = topbar("config");
+loadHealth();
+
+async function loadConfig() {
+  const cfg = await api("GET", "/api/config");
+  document.getElementById("system-prompt").value = cfg.system_prompt;
+  document.getElementById("model").value = cfg.model;
+  document.getElementById("model-options").textContent = "建议：" + cfg.model_options.join(" / ");
+  document.getElementById("memory-enabled").checked = cfg.memory_enabled;
+  document.getElementById("keep-recent").value = cfg.memory_keep_recent;
+  document.getElementById("summarize-at").value = cfg.memory_summarize_at;
+  document.getElementById("extract-every").value = cfg.memory_extract_every;
+
+  const enabled = new Set(cfg.tools_enabled.length ? cfg.tools_enabled : cfg.tools_catalog.map(t => t.name));
+  document.getElementById("tools").innerHTML = cfg.tools_catalog.map(t => `
+    <div class="tool-item">
+      <input type="checkbox" data-tool="${t.name}" ${enabled.has(t.name) ? "checked" : ""}>
+      <div>
+        <div class="name">${escapeHtml(t.name)} <span class="hint">[${escapeHtml(t.group)}]</span></div>
+        <div class="hint">${escapeHtml(t.description)}</div>
+      </div>
+    </div>`).join("");
+}
+
+document.getElementById("save").onclick = async () => {
+  const toolsEnabled = Array.from(document.querySelectorAll("[data-tool]"))
+    .filter(c => c.checked).map(c => c.dataset.tool);
+  const body = {
+    system_prompt: document.getElementById("system-prompt").value,
+    model: document.getElementById("model").value.trim(),
+    tools_enabled: toolsEnabled,
+    memory_enabled: document.getElementById("memory-enabled").checked,
+    memory_keep_recent: Number(document.getElementById("keep-recent").value) || 0,
+    memory_summarize_at: Number(document.getElementById("summarize-at").value) || 12,
+    memory_extract_every: Number(document.getElementById("extract-every").value) || 3,
+  };
+  const saved = await api("PUT", "/api/config", body);
+  await loadConfig();   // 回填被钳制后的值
+  const msg = document.getElementById("save-msg");
+  if (saved.notices && saved.notices.length) {
+    msg.textContent = "已保存，但做了调整：" + saved.notices.join("；");
+    msg.style.color = "#b45309";
+  } else {
+    msg.textContent = "已保存，下一轮对话生效";
+    msg.style.color = "#1a7f37";
+  }
+  setTimeout(() => { msg.textContent = ""; }, 6000);
+};
+
+async function loadMemories() {
+  const list = await api("GET", "/api/memories");
+  document.getElementById("mem-count").textContent = list.length ? `（${list.length} 条）` : "（空）";
+  document.querySelector("#memories tbody").innerHTML = list.length
+    ? list.map(m => `<tr>
+        <td>${escapeHtml(m.kind)}</td>
+        <td>${escapeHtml(m.content)}</td>
+        <td><button class="btn danger" data-del="${m.id}">删除</button></td>
+      </tr>`).join("")
+    : `<tr><td colspan="3" class="hint">还没有记忆（聊到第 3 轮会自动提炼）</td></tr>`;
+}
+
+document.querySelector("#memories").addEventListener("click", async (e) => {
+  const id = e.target.dataset.del;
+  if (!id) return;
+  await api("DELETE", "/api/memories/" + id);
+  loadMemories();
+});
+
+document.getElementById("mem-add").onclick = async () => {
+  const kind = document.getElementById("mem-kind").value.trim() || "偏好";
+  const content = document.getElementById("mem-content").value.trim();
+  if (!content) return;
+  await api("POST", "/api/memories", { kind, content });
+  document.getElementById("mem-content").value = "";
+  loadMemories();
+};
+
+document.getElementById("mem-clear").onclick = async () => {
+  if (!confirm("清空全部长期记忆？")) return;
+  await fetch("/api/memories", { method: "DELETE" });
+  loadMemories();
+};
+
+async function loadStats() {
+  const s = await api("GET", "/api/stats");
+  const items = [
+    ["会话数", s.conversations],
+    ["消息数", s.messages],
+    ["累计 token", s.tokens],
+    ["工具调用次数", s.tool_calls],
+    ["长期记忆", s.memories],
+    ["知识库文档", s.documents],
+    ["知识库切块", s.chunks],
+    ["平均响应(ms)", s.avg_latency_ms],
+  ];
+  document.getElementById("stats").innerHTML = items.map(([lab, num]) =>
+    `<div class="stat"><div class="num">${num}</div><div class="lab">${lab}</div></div>`).join("");
+}
+
+loadConfig().then(loadMemories).then(loadStats);
+</script>
+</body>
+</html>

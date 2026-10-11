@@ -1,0 +1,88 @@
+"""全局配置：统一从 .env 读取，供各模块引用。"""
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# 项目根目录（backend/ 的上一级）
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# 读取 .env（不存在也不报错，方便纯骨架启动）
+load_dotenv(BASE_DIR / ".env")
+
+# 默认系统提示词（步骤 8 起由配置页覆盖）
+DEFAULT_SYSTEM_PROMPT = """你是一名严谨的上市公司财报分析助手。
+
+系统会在消息末尾附上**本轮预取的资料**，分两条通道：
+- 通道 A｜年报原文片段（本地检索，带文件名与页码）→ 引用时写（A-片段 N）
+- 通道 B｜结构化财务数据（akshare，字段与期间明确）→ 引用时写（B）
+
+回答规则：
+1. **涉及公司事实或数字时，必须严格依据上面预取的资料**，不得凭记忆作答；
+   资料里没有的，就直说"未找到相关依据"。
+2. **每个结论后都要标出依据来自哪条通道**：通道 A 写（A-片段 N），通道 B 写（B）。
+   这样读者能分清数字是"年报文本口径"还是"结构化数据口径"。
+3. 预取资料不够时可以补充调用工具（直接调用，不要输出"我来查一下"这类过程说明）：
+   - search_knowledge：再检索年报原文
+   - get_stock_financials：取结构化财务数据
+   - calculate：做精确计算，不要自己心算
+4. **预取资料里没有「片段 N」时，回答里绝不允许出现该字样** —— 那是伪造引用。
+5. 数字要说明口径（单位、期间）。**单位换算（元 / 万元 / 千元 / 亿元）必须调用 calculate 验算，不要心算**；
+   结构化财务数据里已经给出换算结果，优先直接采用，不要自己再换算一遍。
+6. 不给投资建议，只呈现事实与依据。
+7. 回答**简洁直接**，不要长篇铺陈；除非用户明确要求详细展开。
+"""
+
+
+class Settings:
+    # ---- 云端模型（OpenAI 兼容）----
+    API_KEY: str = os.getenv("DASHSCOPE_API_KEY", "")
+    BASE_URL: str = os.getenv(
+        "BAILIAN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    )
+    EMBED_MODEL: str = os.getenv("EMBED_MODEL", "text-embedding-v4")
+    CHAT_MODEL: str = os.getenv("CHAT_MODEL", "qwen-plus")
+    REWRITE_MODEL: str = os.getenv("REWRITE_MODEL") or os.getenv("CHAT_MODEL", "qwen-plus")
+
+    # ---- 限制项（技术方案 §7 上下文预算 / §8 约束）----
+    MAX_MODEL_CALLS: int = int(os.getenv("MAX_MODEL_CALLS", "5"))        # 单轮最多几次模型调用
+    MAX_OUTPUT_TOKENS: int = int(os.getenv("MAX_OUTPUT_TOKENS", "1500"))  # 单次回答输出上限
+    TOOL_RESULT_MAX_CHARS: int = int(os.getenv("TOOL_RESULT_MAX_CHARS", "2400"))  # 单条工具结果上限
+    REWRITE_MAX_TOKENS: int = int(os.getenv("REWRITE_MAX_TOKENS", "120"))          # 查询改写输出上限
+    # 注：这里**不再有**「带几条历史」的参数 —— 那由配置页的 memory_keep_recent 统一管，
+    #     避免两个旋钮管同一件事、其中一个形同虚设。
+
+    # ---- 数据库后端（sqlite | mysql）----
+    # 默认 sqlite：别人 clone 下来不配任何东西也能跑；本机切 mysql 只改 .env。
+    DB_BACKEND: str = os.getenv("DB_BACKEND", "sqlite").lower()
+    MYSQL_HOST: str = os.getenv("MYSQL_HOST", "127.0.0.1")
+    MYSQL_PORT: int = int(os.getenv("MYSQL_PORT", "3306"))
+    MYSQL_USER: str = os.getenv("MYSQL_USER", "finagent")
+    MYSQL_PASSWORD: str = os.getenv("MYSQL_PASSWORD", "")
+    MYSQL_DATABASE: str = os.getenv("MYSQL_DATABASE", "finagent")
+
+    # ---- 服务 ----
+    HOST: str = os.getenv("HOST", "127.0.0.1")
+    PORT: int = int(os.getenv("PORT", "8000"))
+
+    # ---- 路径 ----
+    BASE_DIR: Path = BASE_DIR
+    DATA_DIR: Path = BASE_DIR / "data"
+    RAW_DIR: Path = BASE_DIR / "data" / "raw"
+    FRONTEND_DIR: Path = BASE_DIR / "frontend"
+    DB_PATH: Path = BASE_DIR / "data" / "app.db"
+
+    @property
+    def llm_ready(self) -> bool:
+        """是否已填入可用的 key（含占位符检测）。"""
+        key = self.API_KEY.strip()
+        return bool(key) and not key.startswith("sk-在这里")
+
+    def ensure_dirs(self) -> None:
+        self.RAW_DIR.mkdir(parents=True, exist_ok=True)
+
+
+settings = Settings()
+settings.ensure_dirs()

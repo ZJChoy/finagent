@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FinAgent · 知识库</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<div id="top"></div>
+
+<div class="container">
+  <div class="card">
+    <h2>上传年报 PDF</h2>
+    <div class="desc">
+      支持文字型 PDF（年报 / 公告）。上传后自动：解析 → 去页眉页脚 → 按页切分 → 云端向量化 → 建本地索引。
+    </div>
+    <div class="row">
+      <input type="file" id="file" accept=".pdf">
+      <button class="btn" id="upload">上传并入库</button>
+      <span class="hint" id="up-msg"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>已入库文档 <span class="hint" id="index-info"></span></h2>
+    <table id="docs">
+      <thead><tr><th>文件名</th><th>切块</th><th>页数</th><th>向量模型</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>检索测试（召回优化对比）</h2>
+    <div class="desc">直接看向量召回结果，<b>不经过大模型</b> —— 用来对比不同 top_k / 切分参数的效果。</div>
+    <div class="row">
+      <input type="text" id="q" style="flex:1;min-width:240px" placeholder="输入检索词，例如：主营业务 毛利率">
+      <span class="hint">top_k</span>
+      <input type="number" id="topk" value="5" min="1" max="20" style="width:70px">
+      <button class="btn" id="search">检索</button>
+    </div>
+    <div id="hits"></div>
+  </div>
+</div>
+
+<script src="/assets/app.js"></script>
+<script>
+document.getElementById("top").outerHTML = topbar("knowledge");
+loadHealth();
+
+async function loadDocs() {
+  const d = await api("GET", "/api/documents");
+  document.getElementById("index-info").textContent =
+    `共 ${d.documents.length} 份 / ${d.chunks} 块 · 向量库 ${d.embedding_models.join(",") || "空"}`;
+  const tb = document.querySelector("#docs tbody");
+  tb.innerHTML = d.documents.length
+    ? d.documents.map((x) => `<tr>
+        <td>${escapeHtml(x.name)}</td>
+        <td>${x.points}</td>
+        <td>${x.pages}</td>
+        <td>${escapeHtml(x.embedding_model)}</td>
+        <td><button class="btn danger" data-del="${escapeHtml(x.name)}">删除</button></td>
+      </tr>`).join("")
+    : `<tr><td colspan="5" class="hint">还没有文档</td></tr>`;
+}
+
+document.querySelector("#docs").addEventListener("click", async (e) => {
+  const f = e.target.dataset.del;
+  if (!f) return;
+  await api("DELETE", "/api/documents/" + encodeURIComponent(f));
+  loadDocs();
+});
+
+document.getElementById("upload").onclick = async () => {
+  const file = document.getElementById("file").files[0];
+  const msg = document.getElementById("up-msg");
+  if (!file) { msg.textContent = "请先选文件"; return; }
+  msg.style.color = "";
+  msg.textContent = "解析并向量化中…（大文件需等一会儿）";
+  const fd = new FormData();
+  fd.append("file", file);
+  try {
+    const r = await fetch("/api/documents/upload", { method: "POST", body: fd });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || "上传失败");
+    msg.style.color = "#1a7f37";
+    msg.textContent = `完成：${j.doc} → ${j.chunks} 块 / ${j.pages} 页`;
+    document.getElementById("file").value = "";
+    loadDocs();
+  } catch (err) {
+    msg.style.color = "#c0392b";
+    msg.textContent = "失败：" + err.message;
+  }
+};
+
+document.getElementById("search").onclick = async () => {
+  const q = document.getElementById("q").value.trim();
+  const topk = Number(document.getElementById("topk").value) || 5;
+  const box = document.getElementById("hits");
+  if (!q) return;
+  box.innerHTML = '<div class="hint">检索中…</div>';
+  try {
+    const r = await api("POST", "/api/documents/search", { query: q, top_k: topk });
+    box.innerHTML = r.hits.length
+      ? r.hits.map((h) => `<div class="hit">
+          <div class="head">片段 ${h.no} · ${escapeHtml(h.doc)} 第 ${h.page} 页 · 相似度 ${h.score}</div>
+          <pre>${escapeHtml(h.text.slice(0, 400))}${h.text.length > 400 ? "…" : ""}</pre>
+        </div>`).join("")
+      : '<div class="hint">没有召回结果（知识库可能为空）</div>';
+  } catch (err) {
+    box.innerHTML = `<div class="hint" style="color:#c0392b">检索失败：${escapeHtml(err.message)}</div>`;
+  }
+};
+
+loadDocs();
+</script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+# 环境与密钥
+.env
+
+# 数据：语料 PDF（data/raw）随仓库分发，供 clone 后直接入库
+# 数据库与向量索引是生成物，不进 git
+data/app.db
+data/index/
+data/*.db
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 编辑器 / 系统
+.idea/
+.vscode/
+.DS_Store

@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FinAgent · 对话</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<div id="top"></div>
+
+<div class="layout">
+  <aside class="sidebar">
+    <button class="new-btn" id="new-conv">+ 新建对话</button>
+    <div id="conv-list"></div>
+    <div class="sidebar-foot" id="conv-count"></div>
+  </aside>
+
+  <div class="main">
+    <div id="messages"></div>
+    <div class="composer">
+      <div class="composer-inner">
+        <textarea id="input" rows="1"
+          placeholder="问点什么，例如：美的集团2025年的营业收入是多少？"></textarea>
+        <button id="send">发送</button>
+      </div>
+      <div class="hint">
+        Enter 发送 · Shift+Enter 换行 · 会话与消息会存进本地 SQLite（重启后仍在）
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/assets/app.js"></script>
+<script>
+document.getElementById("top").outerHTML = topbar("chat");
+loadHealth();
+
+const messagesEl = document.getElementById("messages");
+const inputEl = document.getElementById("input");
+const sendBtn = document.getElementById("send");
+const convListEl = document.getElementById("conv-list");
+const convCountEl = document.getElementById("conv-count");
+
+let conversationId = null;
+let busy = false;
+
+/* ---------------- 渲染 ---------------- */
+function scrollDown() { messagesEl.scrollTop = messagesEl.scrollHeight; }
+
+function addUser(text) {
+  const div = document.createElement("div");
+  div.className = "msg user";
+  div.innerHTML = `<div class="avatar">我</div><div class="bubble">${md(text)}</div>`;
+  messagesEl.appendChild(div);
+  scrollDown();
+}
+
+function addAssistant() {
+  const div = document.createElement("div");
+  div.className = "msg assistant";
+  div.innerHTML = `<div class="avatar">AI</div>
+    <div class="bubble">
+      <div class="tools"></div>
+      <div class="content"><span class="thinking">思考中…</span></div>
+      <div class="cite"></div>
+    </div>`;
+  messagesEl.appendChild(div);
+  scrollDown();
+  return {
+    stream: "",
+    contentEl: div.querySelector(".content"),
+    citeEl: div.querySelector(".cite"),
+    toolsEl: div.querySelector(".tools"),
+  };
+}
+
+/* 工具调用前模型可能输出"我来查一下"这类叙述 —— 挪到「思考」区，别混进答案 */
+function parkThinking(a) {
+  const t = (a.stream || "").trim();
+  if (!t) return;
+  const el = document.createElement("div");
+  el.className = "thinking-block";
+  el.textContent = t;
+  a.toolsEl.appendChild(el);
+  a.stream = "";
+  a.contentEl.innerHTML = '<span class="thinking">思考中…</span>';
+}
+
+function note(a, text, cls) {
+  const el = document.createElement("div");
+  el.className = cls || "rewrite-note";
+  el.textContent = text;
+  a.toolsEl.appendChild(el);
+}
+
+function addToolChip(a, name, args) {
+  const el = document.createElement("div");
+  el.className = "tool-chip";
+  el.textContent = "调用工具 · " + name + "(" + JSON.stringify(args || {}) + ")";
+  a.toolsEl.appendChild(el);
+}
+
+function addToolResult(a, name, content) {
+  const el = document.createElement("details");
+  el.className = "tool-result";
+  el.innerHTML =
+    `<summary>${escapeHtml(name)} 返回（点击展开）</summary><pre>${escapeHtml(content)}</pre>`;
+  a.toolsEl.appendChild(el);
+}
+
+function renderCitations(a, items) {
+  if (!items || !items.length) return;
+  a.citeEl.innerHTML =
+    '<div class="cites"><b>引用出处</b>' +
+    items.map((c) =>
+      `<div class="cite-row"><span class="cite-no">片段 ${c.no}</span>` +
+      `<span class="cite-src">${escapeHtml(c.doc)} 第 ${c.page} 页</span>` +
+      `<span class="cite-score">相似度 ${c.score}</span>` +
+      `<div class="cite-prev">${escapeHtml(c.preview || "")}…</div></div>`
+    ).join("") + "</div>";
+}
+
+/* ---------------- 会话侧栏 ---------------- */
+async function loadConversations() {
+  const list = await api("GET", "/api/conversations");
+  convCountEl.textContent = list.length ? `共 ${list.length} 个会话` : "";
+  convListEl.innerHTML = list.map((c) => `
+    <div class="conv-item ${c.id === conversationId ? "active" : ""}" data-id="${c.id}">
+      <span class="title">${escapeHtml(c.title || "新对话")}</span>
+      <span class="del" data-del="${c.id}" title="删除">×</span>
+    </div>`).join("") || '<div class="hint" style="padding:8px">还没有会话</div>';
+}
+
+async function openConversation(cid) {
+  conversationId = cid;
+  messagesEl.innerHTML = "";
+  const msgs = await api("GET", `/api/conversations/${cid}/messages`);
+  for (const m of msgs) {
+    if (m.role === "user") {
+      addUser(m.content);
+    } else if (m.role === "assistant") {
+      const a = addAssistant();
+      a.stream = m.content || "";
+      a.contentEl.innerHTML = md(a.stream);
+      (m.tool_calls || []).forEach((t) => addToolChip(a, t.name, t.arguments));
+      renderCitations(a, m.citations || []);
+    }
+  }
+  scrollDown();
+  loadConversations();
+}
+
+convListEl.addEventListener("click", async (e) => {
+  const del = e.target.dataset.del;
+  if (del) {
+    await api("DELETE", "/api/conversations/" + del);
+    if (Number(del) === conversationId) { conversationId = null; messagesEl.innerHTML = ""; }
+    loadConversations();
+    return;
+  }
+  const item = e.target.closest(".conv-item");
+  if (item) openConversation(Number(item.dataset.id));
+});
+
+document.getElementById("new-conv").onclick = () => {
+  conversationId = null;
+  messagesEl.innerHTML = "";
+  loadConversations();
+  inputEl.focus();
+};
+
+/* ---------------- 发送 ---------------- */
+async function send() {
+  const text = inputEl.value.trim();
+  if (!text || busy) return;
+  busy = true;
+  sendBtn.disabled = true;
+
+  addUser(text);
+  inputEl.value = "";
+  inputEl.style.height = "auto";
+
+  const a = addAssistant();
+
+  try {
+    const resp = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text, conversation_id: conversationId }),
+    });
+    if (!resp.ok || !resp.body) throw new Error(await resp.text());
+
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf("\n\n")) >= 0) {
+        const line = buf.slice(0, idx).replace(/^data:\s*/, "");
+        buf = buf.slice(idx + 2);
+        if (!line) continue;
+        let ev;
+        try { ev = JSON.parse(line); } catch (err) { continue; }
+        handleEvent(ev, a);
+      }
+    }
+  } catch (err) {
+    a.contentEl.innerHTML = `<p style="color:#c0392b">出错了：${escapeHtml(err.message)}</p>`;
+  }
+
+  busy = false;
+  sendBtn.disabled = false;
+  inputEl.focus();
+  loadConversations();
+}
+
+function handleEvent(ev, a) {
+  if (ev.type === "meta") {
+    if (!conversationId) conversationId = ev.conversation_id;
+  } else if (ev.type === "citations") {
+    renderCitations(a, ev.items);
+    scrollDown();
+  } else if (ev.type === "rewrite") {
+    note(a, "查询已改写：" + ev.query);
+  } else if (ev.type === "gate") {
+    note(a, ev.message);
+  } else if (ev.type === "tool_call") {
+    parkThinking(a);
+    addToolChip(a, ev.name, ev.arguments);
+  } else if (ev.type === "tool_result") {
+    addToolResult(a, ev.name, ev.content);
+  } else if (ev.type === "warning") {
+    note(a, "注意：" + ev.message, "warn-note");
+  } else if (ev.type === "replace") {
+    a.stream = ev.content;
+    a.contentEl.innerHTML = md(a.stream);
+    scrollDown();
+  } else if (ev.type === "content") {
+    a.stream += ev.delta;
+    a.contentEl.innerHTML = md(a.stream);
+    scrollDown();
+  } else if (ev.type === "end") {
+    if (ev.content) {
+      a.stream = ev.content;
+      a.contentEl.innerHTML = md(a.stream);
+    }
+  } else if (ev.type === "error") {
+    const msg = `<p style="color:#c0392b">出错了：${escapeHtml(ev.message)}</p>`;
+    a.contentEl.innerHTML = a.stream ? md(a.stream) + msg : msg;
+  }
+}
+
+sendBtn.onclick = send;
+inputEl.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+});
+inputEl.addEventListener("input", () => {
+  inputEl.style.height = "auto";
+  inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + "px";
+});
+
+loadConversations();
+inputEl.focus();
+</script>
+</body>
+</html>
