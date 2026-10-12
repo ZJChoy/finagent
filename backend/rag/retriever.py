@@ -1,13 +1,16 @@
-"""检索服务：query → 向量召回 → 组装上下文与引用。
+"""检索服务：query → 向量召回 →（可选）重排 → 组装上下文与引用。
 
 参数取自技术方案 §3「关键参数」：
-- 先召回 `candidates=30` 条，给**将来的重排**留候选空间；
+- 先召回 `candidates=30` 条，给**重排**留候选空间；
 - 最终取 `top_k=5` 条注入上下文。
-本步骤**不做重排** —— 按定稿：用第 9 步的评测数据再决定它值不值。
+
+**重排默认关闭**（`RERANK_ENABLED=1` 才开）—— 按定稿原则：先有评测数据，再决定它值不值。
+评测对比见 `eval/retrieval_report.md`。
 """
 from __future__ import annotations
 
-from . import embedder, store
+from ..config import settings
+from . import embedder, rerank, store
 
 CANDIDATES = 30
 TOP_K = 5
@@ -24,6 +27,12 @@ def retrieve(
         return []
     qv = embedder.embed_query(query)
     hits = store.search(qv, top_k=max(candidates, top_k), doc=doc)
+
+    if settings.RERANK_ENABLED and len(hits) > top_k:
+        order, ok = rerank.rerank(query, [h["text"] for h in hits], top_n=top_k)
+        if ok:
+            return [hits[i] for i in order][:top_k]
+        # 重排失败就退回向量顺序 —— 质量可以退化，链路不能断
     return hits[:top_k]
 
 

@@ -163,6 +163,7 @@ def main() -> None:
     lat = [r["latency"] for r in rows if r.get("latency")]
     firsts = [r["first_latency"] for r in rows if r.get("first_latency")]
     toks = [r["tokens"] for r in rows if r.get("tokens")]
+    lens = [len(r["answer"] or "") for r in rows]  # 答案字数：用来观察"去废话"是否生效
     ok = sum(1 for r in rows if r["verdict"].startswith("✅"))
     bad = sum(1 for r in rows if r["verdict"].startswith("❌"))
 
@@ -196,6 +197,7 @@ def main() -> None:
         f"| 自动初判失败 | {bad} |",
         f"| 首字延迟 中位 / P95 | {pct(firsts, 50)}s / {pct(firsts, 95)}s |",
         f"| 完成延迟 中位 / P95 | {pct(lat, 50)}s / {pct(lat, 95)}s |",
+        f"| **答案字数 中位 / P95** | **{pct(lens, 50)} / {pct(lens, 95)}** |",
         f"| token 中位 / 合计 | {int(statistics.median(toks)) if toks else '-'} / {sum(toks) if toks else '-'} |",
         f"| 平均引用条数 | {round(statistics.mean([r['citations'] for r in rows]), 1)} |",
         f"| 可疑引用题数 | {sum(1 for r in rows if r['invalid_citations'])} |",
@@ -206,15 +208,15 @@ def main() -> None:
         "",
         "## 三、逐题明细",
         "",
-        "| # | 分类 | 问题 | 首字(s) | 完成(s) | tokens | 引用 | 预取 | 工具 | 初判 |",
-        "|---|---|---|---|---|---|---|---|---|---|",
+        "| # | 分类 | 问题 | 首字(s) | 完成(s) | 字数 | tokens | 引用 | 预取 | 工具 | 初判 |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for r in rows:
         pre = r.get("prefetched") or {}
         pre_txt = f"A{pre.get('fragments', 0)}" + ("+B" if pre.get("snapshot") else "")
         lines.append(
             f"| {r['id']} | {r['category']} | {r['question'][:28]} | {r['first_latency']} | "
-            f"{r['latency']} | {r['tokens']} | {r['citations']} | {pre_txt} | "
+            f"{r['latency']} | {len(r['answer'] or '')} | {r['tokens']} | {r['citations']} | {pre_txt} | "
             f"{','.join(r['tool_calls']) or '-'} | {r['verdict']} |"
         )
 

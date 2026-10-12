@@ -41,6 +41,8 @@ def health():
         "base_url": settings.BASE_URL,
         "db": dbconn.DIALECT,
         "db_ok": ping.get("ok"),
+        "retrieval_index": store.active_vector_path().name,
+        "rerank": settings.RERANK_ENABLED,
     }
 
 

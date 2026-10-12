@@ -32,7 +32,13 @@ DEFAULT_SYSTEM_PROMPT = """你是一名严谨的上市公司财报分析助手�
 5. 数字要说明口径（单位、期间）。**单位换算（元 / 万元 / 千元 / 亿元）必须调用 calculate 验算，不要心算**；
    结构化财务数据里已经给出换算结果，优先直接采用，不要自己再换算一遍。
 6. 不给投资建议，只呈现事实与依据。
-7. 回答**简洁直接**，不要长篇铺陈；除非用户明确要求详细展开。
+7. 回答要**精简**：
+   - 用「**结论 + 要点**」结构，分点写，**每点一句话**；先给结论，再列要点。
+   - 篇幅：定性/数值类问题 **300 字以内**；对比或多指标综合类 **500 字以内**。
+     除非用户明确要求"详细展开"。
+   - **不要复述**用户的问题，也**不要复述资料原文**，直接给结论与关键数字。
+   - **不要在结尾问**"是否需要进一步分析 / 要不要我帮你查…"之类的主动追问。
+     （用户需要更多细节时会自己接着问。）
 """
 
 
@@ -53,6 +59,24 @@ class Settings:
     REWRITE_MAX_TOKENS: int = int(os.getenv("REWRITE_MAX_TOKENS", "120"))          # 查询改写输出上限
     # 注：这里**不再有**「带几条历史」的参数 —— 那由配置页的 memory_keep_recent 统一管，
     #     避免两个旋钮管同一件事、其中一个形同虚设。
+
+    # ---- 重排（检索后精排，见 rag/rerank.py）----
+    # 默认关闭：等第 9 步的评测数据说话，不凭直觉开
+    RERANK_ENABLED: bool = os.getenv("RERANK_ENABLED", "0") == "1"
+    RERANK_MODEL: str = os.getenv("RERANK_MODEL", "qwen3-rerank")
+    RERANK_URL: str = os.getenv("RERANK_URL", "")  # 留空则从 BASE_URL 推 host
+    RERANK_TIMEOUT: int = int(os.getenv("RERANK_TIMEOUT", "30"))
+
+    # ---- 财务数据缓存（akshare 取数一次约 7s，同公司反复问会重复取）----
+    # 缓存在磁盘上（data/cache/financials/），所以**重启不丢**；
+    # 财务数据按季更新，12 小时的有效期足够新。
+    FIN_CACHE_ENABLED: bool = os.getenv("FIN_CACHE_ENABLED", "1") == "1"
+    FIN_CACHE_TTL: int = int(os.getenv("FIN_CACHE_TTL", str(12 * 3600)))
+
+    # ---- 检索用哪套向量索引（见 rag/store.py 的变体表）----
+    # base = 原始索引；ctx = 章节路径；llmctx = LLM 专属上下文（实测 MRR 0.77→0.89）
+    # 找不到对应文件时**自动退回 base**，所以新克隆的仓库不会因此报错。
+    RETRIEVAL_INDEX: str = os.getenv("RETRIEVAL_INDEX", "llmctx").lower()
 
     # ---- 数据库后端（sqlite | mysql）----
     # 默认 sqlite：别人 clone 下来不配任何东西也能跑；本机切 mysql 只改 .env。

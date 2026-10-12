@@ -31,6 +31,28 @@ INDEX_DIR: Path = settings.DATA_DIR / "index" / dbconn.DIALECT
 VEC_PATH: Path = INDEX_DIR / "vectors.npy"
 DIM = 1024
 
+# 索引变体：同一批切块可以有多套向量（正文相同，只是**向量化时喂的文本不同**）。
+#
+# ⚠️ **只放"值得在生产选"的变体**。`ctx`（正文前拼规则式章节路径）实测 MRR 0.7216 < 基线 0.7679，
+#    结论是"章节标题是高频低区分度文本，加进去反而稀释语义"—— 所以它**不进这张表**：
+#    生产不该能选到一个已知更差的变体。实验脚本自己管路径，结论留在 `eval/retrieval_report.md`。
+#
+# - base  ：直接用切块正文
+# - llmctx：正文前拼「chunk 专属说明」（LLM 生成，实测 MRR 0.7679 → 0.8925）
+#
+# **读索引走变体、写索引永远写 base** —— 否则切换变体时会把压缩后的向量写错文件。
+VARIANTS: dict[str, str] = {
+    "base": "vectors.npy",
+    "llmctx": "vectors_llmctx.npy",
+}
+
+
+def active_vector_path() -> Path:
+    """当前生效的向量文件；对应变体不存在时退回 base。"""
+    name = VARIANTS.get(settings.RETRIEVAL_INDEX, VARIANTS["base"])
+    path = INDEX_DIR / name
+    return path if path.exists() else VEC_PATH
+
 _SCHEMA = f"""
 CREATE TABLE IF NOT EXISTS rag_documents (
     name            {dbconn.KEY_STR} PRIMARY KEY,
@@ -174,9 +196,28 @@ def embedding_models() -> list[str]:
     )]
 
 
-def search(query_vec: list[float], top_k: int = 5, doc: str | None = None) -> list[dict]:
-    """向量召回：先按元数据筛选，再对子集做点积。返回带 score 的命中列表。"""
-    arr = _load_vectors()
+def load_vectors(path: Path | None = None) -> np.ndarray:
+    """读取向量文件。`path` 为 None 时用默认索引。"""
+    target = path or VEC_PATH
+    if target.exists():
+        arr = np.load(target)
+        if arr.size:
+            return arr.astype(np.float32)
+    return np.zeros((0, DIM), dtype=np.float32)
+
+
+def search(
+    query_vec: list[float],
+    top_k: int = 5,
+    doc: str | None = None,
+    vectors: np.ndarray | None = None,
+) -> list[dict]:
+    """向量召回：先按元数据筛选，再对子集做点积。返回带 score 的命中列表。
+
+    `vectors` 可注入另一套向量（用于对比「原始索引 vs 章节上下文索引」这类实验）；
+    不传则用**当前生效的索引变体**（`RETRIEVAL_INDEX`，见 `active_vector_path()`）。
+    """
+    arr = vectors if vectors is not None else load_vectors(active_vector_path())
     if arr.size == 0:
         return []
 

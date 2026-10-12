@@ -1,0 +1,61 @@
+# FinAgent 一键起：应用 + MySQL
+#
+#   docker compose up -d          # 起服务（首次会自动建库建表）
+#   docker compose logs -f app    # 看日志
+#   docker compose down           # 停（数据保留在卷里）
+#   docker compose down -v        # 停并删数据
+#
+# 注意：容器的 MySQL 映射到宿主 **3307**（不是 3306），
+#       避免和本机已装的 MySQL 撞端口。
+#
+# `.env` 由 compose 自动读取（只用于变量插值；**不会**打进镜像）。
+
+services:
+  mysql:
+    image: mysql:8.4
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请在 FinAgent/.env 里设置 MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: finagent
+      MYSQL_USER: finagent
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?请在 FinAgent/.env 里设置 MYSQL_PASSWORD}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p'$$MYSQL_ROOT_PASSWORD' --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
+  app:
+    build: .
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      # ---- 数据库：走 compose 里的 mysql ----
+      DB_BACKEND: mysql
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_USER: finagent
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?请在 FinAgent/.env 里设置 MYSQL_PASSWORD}
+      MYSQL_DATABASE: finagent
+      # ---- 检索：LLM 专属上下文索引（实测 MRR +16%）----
+      RETRIEVAL_INDEX: llmctx
+      # ---- 云端模型 Key：从宿主 .env 插值进来，缺失会直接报错而不是静默失败 ----
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:?请在 FinAgent/.env 里设置 DASHSCOPE_API_KEY}
+    volumes:
+      # 语料 / 向量索引 / SQLite 都落在这里 —— 容器重建也不丢
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+volumes:
+  mysql-data:

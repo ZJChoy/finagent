@@ -6,6 +6,7 @@
 data/app.db
 data/index/
 data/*.db
+data/cache/
 
 # Python
 __pycache__/
