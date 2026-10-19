@@ -1,0 +1,38 @@
+# 构建上下文里不要的东西 —— 镜像只需要"能跑起来"的部分
+#
+# ⚠️ data/raw（年报 PDF）**要保留**，它是"clone 后直接入库"的语料。
+# ⚠️ data/index 与 data/app.db 是生成物，排除掉；容器里用挂载的 ./data 拿。
+
+.git
+.gitignore
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 密钥：绝不能进镜像
+.env
+.env.*
+!.env.example
+
+# 生成物（走挂载卷）
+data/app.db
+data/*.db
+data/index/
+data/cache/
+data/spike/
+
+# 评测与文档：运行时用不到
+eval/
+docs/
+简历项目/
+
+# 编辑器 / 系统
+.idea/
+.vscode/
+.DS_Store
+
+# 除 README 外的 markdown 都不进镜像
+*.md
+!README.md

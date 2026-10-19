@@ -1,0 +1,104 @@
+# RAG 引用命中率金标（D6-7 · G4，D8-9 修订）
+# 金标核定方式：探针检索 + 关键词在页内验证（🟢），人工核对；±1 页容差（滑窗切块边界）。
+# D8-9 修订：grounding 题 gold 从单页改为 acceptable 列表——同一内容在年报中常有多个等价出处
+#（2024/2025 两版年报、业务概述 vs 分部信息），列表中每一页都经过探针关键词验证，非放水。
+# 拒答题金标 = 行为期望（正确拒答、不编造），无页码。
+# D8-9 再修订：数字题（metric: value）改用【数值一致性】判定——query 改写使检索页码动态变化，
+# 页码金标对数字题不适用；gold_values 全部提取自年报原文页文本（store 实查，零编造）。
+
+questions:
+  - category: grounding
+    question: 贵州茅台的主营业务是什么？
+    acceptable:
+      - {doc: 600519_2025_annual.PDF, page: 54}
+      - {doc: 600519_2025_annual.PDF, page: 8}
+    keywords: [茅台酒, 系列酒]
+
+  - category: grounding
+    question: 贵州茅台的销售渠道分为哪几类？
+    acceptable:
+      - {doc: 600519_2025_annual.PDF, page: 17}
+      - {doc: 600519_2025_annual.PDF, page: 8}
+      - {doc: 600519_2024_annual.PDF, page: 16}
+      - {doc: 600519_2024_annual.PDF, page: 17}
+    keywords: [直销, 批发代理]
+
+  - category: grounding
+    question: 贵州茅台的分红政策是怎样的？
+    acceptable:
+      - {doc: 600519_2025_annual.PDF, page: 2}
+      - {doc: 600519_2024_annual.PDF, page: 2}
+      - {doc: 600519_2025_annual.PDF, page: 34}
+    keywords: [现金红利]
+
+  - category: grounding
+    question: 贵州茅台在年报里提到的行业竞争格局如何？
+    acceptable:
+      - {doc: 600519_2025_annual.PDF, page: 21}
+      - {doc: 600519_2025_annual.PDF, page: 9}
+    keywords: [行业格局, 竞争]
+
+  - category: grounding
+    question: 美的集团的主要业务板块有哪些？
+    acceptable:
+      - {doc: 000333_2025_annual.PDF, page: 13}
+      - {doc: 000333_2024_annual.PDF, page: 12}
+      - {doc: 000333_2024_annual.PDF, page: 268}
+    keywords: [智能家居, 楼宇科技, 机器人, 分部]
+
+  - category: grounding
+    metric: value
+    question: 美的集团 2025 年营业收入的构成是怎样的？
+    gold_values: ["299,927,239", "122,752,958"]
+    acceptable:
+      - {doc: 000333_2025_annual.PDF, page: 20}
+      - {doc: 000333_2025_annual.PDF, page: 49}
+      - {doc: 000333_2025_annual.PDF, page: 50}
+    keywords: [营业收入]
+
+  - category: grounding
+    metric: value
+    question: 贵州茅台 2025 年营业收入是多少？
+    gold_values: ["16,883,810.25", "168,838,102,514.79", "1,688.38"]
+    acceptable:
+      - {doc: 600519_2025_annual.PDF, page: 54}
+      - {doc: 600519_2025_annual.PDF, page: 61}
+      - {doc: 600519_2025_annual.PDF, page: 8}
+    keywords: [营业收入]
+
+  - category: grounding
+    question: 美的集团的主要风险有哪些？
+    acceptable:
+      - {doc: 000333_2024_annual.PDF, page: 65}
+      - {doc: 000333_2024_annual.PDF, page: 66}
+    keywords: [风险]
+
+  - category: grounding
+    metric: value
+    question: 贵州茅台 2025 年直销渠道收入占总营收的比例是多少？
+    gold_values: ["84,543,031,854.63", "49.14"]
+    acceptable:
+      - {doc: 600519_2025_annual.PDF, page: 18}
+      - {doc: 600519_2025_annual.PDF, page: 17}
+      - {doc: 600519_2025_annual.PDF, page: 10}
+    keywords: [直销, 渠道]
+
+  - category: grounding
+    question: 贵州茅台的生产工艺有什么特点？
+    acceptable:
+      - {doc: 600519_2024_annual.PDF, page: 20}
+      - {doc: 600519_2025_annual.PDF, page: 21}
+      - {doc: 600519_2025_annual.PDF, page: 16}
+    keywords: [生产工艺, 工艺]
+
+  - category: refuse
+    question: 贵州茅台 2030 年的营业收入是多少？
+    acceptable: []
+
+  - category: refuse
+    question: 美的集团下个月的股价会怎么走？
+    acceptable: []
+
+  - category: refuse
+    question: 贵州茅台在 2019 年有没有披露 ESG 报告？
+    acceptable: []
