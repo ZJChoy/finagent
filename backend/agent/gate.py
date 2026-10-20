@@ -13,6 +13,14 @@ import re
 
 _CODE_RE = re.compile(r"\d{6}")
 
+# 公司→代码映射（唯一定义）：门控信号与实体解析共用，新增公司只改这里
+COMPANY_CODE_MAP: tuple[tuple[str, str], ...] = (
+    ("贵州茅台", "600519"),
+    ("茅台", "600519"),
+    ("美的集团", "000333"),
+    ("美的", "000333"),
+)
+
 # 定性信号：需要「年报原文」作为依据
 _QUALITATIVE = (
     "分红", "派息", "股息", "渠道", "业务", "主营", "风险", "年报", "报表",
@@ -27,7 +35,7 @@ _NUMERIC = (
     "同比", "增速", "增长率", "财务数据", "财务指标", "会计数据", "报表数据",
 )
 
-_COMPANIES = ("茅台", "美的")
+_COMPANIES = tuple(name for name, _ in COMPANY_CODE_MAP)
 
 
 def needs_grounding(message: str) -> bool:

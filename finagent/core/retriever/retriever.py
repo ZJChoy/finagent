@@ -25,6 +25,8 @@ def retrieve(
     """检索最相关的若干切块。知识库为空时返回空列表（不报错）。"""
     if not query.strip() or store.count() == 0:
         return []
+    # 与 add_document 同源的护栏：库内模型与当前配置不一致时拒绝检索（fail-closed）
+    store._assert_embedding_model_compatible(settings.EMBED_MODEL)
     qv = embedder.embed_query(query)
     hits = store.search(qv, top_k=max(candidates, top_k), doc=doc)
 

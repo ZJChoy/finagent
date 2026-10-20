@@ -52,7 +52,8 @@ engine = AgentEngine(
 def ask(question: str, history: list[dict] | None = None) -> tuple[str, dict]:
     """返回 (最终回答, end 事件指标)——供评测框架复用。"""
     final, end_ev = "", {}
-    for ev in engine.run(question, history=history):
+    # 只暴露公告检索工具：注册表是全局的（导入即注册财报工具），这里显式收窄
+    for ev in engine.run(question, history=history, enabled_tools=["query_announcements"]):
         if ev["type"] == "end":
             final, end_ev = ev.get("content") or "", ev
     return final, end_ev

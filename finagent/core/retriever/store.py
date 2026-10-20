@@ -97,6 +97,17 @@ def _save_vectors(arr: np.ndarray) -> None:
 
 # ---------------------------------------------------------------- 写入
 
+def _assert_embedding_model_compatible(model: str) -> None:
+    """注释里承诺的"检索前校验"落地：模型混用 = 向量空间不同 = 静默错乱，
+    直接 fail-closed 要求重建索引。"""
+    existing = embedding_models()
+    if existing and not all(m == model for m in existing):
+        raise ValueError(
+            f"embedding 模型混用：库中已有 {existing}，本次为 {model}。"
+            "换模型必须重建索引（先 reset 再重新入库），否则检索结果静默错乱"
+        )
+
+
 def add_document(
     name: str,
     chunks: list[dict],
@@ -108,6 +119,7 @@ def add_document(
     chunks: [{"page": int, "seq": int, "text": str}]
     """
     init()
+    _assert_embedding_model_compatible(embedding_model)
     delete_document(name)
     if not chunks:
         return 0

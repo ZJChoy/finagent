@@ -168,7 +168,10 @@ class AgentEngine:
 
                 yield {"type": "tool_call", "name": name, "arguments": args}
 
-                result = self._registry.call(name, args)
+                if enabled_tools is not None and name not in enabled_tools:
+                    result = {"ok": False, "content": f"工具 {name} 未启用，请改用其他工具或直接回答", "citations": []}
+                else:
+                    result = self._registry.call(name, args)
                 content = result.get("content", "")
 
                 new_citations = result.get("citations") or []

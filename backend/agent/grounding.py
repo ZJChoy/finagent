@@ -15,20 +15,13 @@ import re
 from ..rag import retriever
 from ..tools import finance
 
-# 本地映射：样例语料就两家公司，最稳的一级
-_NAME_TO_CODE = (
-    ("贵州茅台", "600519"),
-    ("茅台", "600519"),
-    ("美的集团", "000333"),
-    ("美的", "000333"),
-)
+# 公司映射收敛到 gate.COMPANY_CODE_MAP（唯一定义），避免多处映射漂移
+from .gate import COMPANY_CODE_MAP as _NAME_TO_CODE
 
 _CODE_IN_QUERY = re.compile(r"\b([036]\d{5})\b")
 
 # 问句里出现的"公司名"，但语料库没收录 —— 必须显式拒答而不是从无关命中里捞代码
 # （实测踩坑：问"格力电器"→ 第 3 级兜底从美的年报文件名捞出 000333 → 数字全真、主语全错）
-_COMPANY_NAME = re.compile(r"([\u4e00-\u9fa5]{2,8}?(?:集团|电器|科技|股份|公司))")
-_KNOWN_NAMES = ("贵州茅台", "茅台", "美的集团", "美的")
 _DOC_CODE = re.compile(r"^(\d{6})[_-]")
 _TEXT_CODE = re.compile(r"(?:证券|股票)\s*代码[：:\s]*([036]\d{5})")
 
