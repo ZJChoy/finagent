@@ -132,10 +132,39 @@ class AgentEngine:
 
             for i, tc in enumerate(tool_calls):
                 name = tc["name"]
+
+                # 参数解析护栏：arguments 必须是合法 JSON 对象。
+                # 解析失败不执行工具，把精确错误作为 tool 消息回填，让模型下一轮自修
+                #（轮次上限 MAX_MODEL_CALLS 兜底，不会死循环）。
+                parse_error: str | None = None
                 try:
                     args = json.loads(tc["arguments"] or "{}")
-                except json.JSONDecodeError:
-                    args = {}
+                    if not isinstance(args, dict):
+                        parse_error = f"arguments 解析成了 {type(args).__name__}，必须是 JSON 对象"
+                except json.JSONDecodeError as e:
+                    parse_error = f"arguments 不是合法 JSON（{e.msg}，位置 {e.pos}）"
+
+                if parse_error is not None:
+                    feedback = (
+                        f"工具 {name} 未执行：{parse_error}。"
+                        "请重新调用该工具，arguments 必须是合法 JSON 对象字符串。"
+                    )
+                    trace.append(
+                        {
+                            "name": name,
+                            "arguments": None,
+                            "result": feedback[:300],
+                            "truncated": False,
+                            "ok": False,
+                            "parse_error": True,
+                        }
+                    )
+                    yield {"type": "tool_call", "name": name, "arguments": None}
+                    yield {"type": "tool_result", "name": name, "content": feedback, "truncated": False}
+                    messages.append(
+                        {"role": "tool", "tool_call_id": tc["id"] or f"call_{i}", "content": feedback}
+                    )
+                    continue
 
                 yield {"type": "tool_call", "name": name, "arguments": args}
 
