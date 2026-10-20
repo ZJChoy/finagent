@@ -95,14 +95,17 @@ def _create_stream(
         attempts.append(base)
 
     last_err: Exception | None = None
-    for kwargs in attempts:
+    for i, kwargs in enumerate(attempts):
         try:
             return client_.chat.completions.create(**kwargs)
         except Exception as e:  # noqa: BLE001
             last_err = e
-            if kwargs.get("tool_choice") == "required":
+            # 除最后一个尝试外都继续降级（stream_options / required 都可能不被支持）；
+            # 失败发生在 create() 阶段（流未开始），重试不会产生重复输出
+            if i < len(attempts) - 1:
                 continue
-    raise last_err  # type: ignore[misc]
+    assert last_err is not None  # attempts 非空
+    raise last_err
 
 
 def stream_chat(

@@ -138,8 +138,14 @@ def list_messages(conv_id: int, after_id: int = 0) -> list[dict]:
         (conv_id, after_id),
     )
     for r in rows:
-        r["citations"] = json.loads(r["citations"] or "[]")
-        r["tool_calls"] = json.loads(r["tool_calls"] or "[]")
+        try:
+            r["citations"] = json.loads(r["citations"] or "[]")
+        except (json.JSONDecodeError, TypeError):
+            r["citations"] = []
+        try:
+            r["tool_calls"] = json.loads(r["tool_calls"] or "[]")
+        except (json.JSONDecodeError, TypeError):
+            r["tool_calls"] = []
     return rows
 
 

@@ -32,10 +32,25 @@ def _eval(node: ast.AST) -> float:
     raise ValueError("表达式含不支持的运算")
 
 
+def _format_number(value: float) -> str:
+    """大数不用科学计数法输出：模型会原样引用字符串，必须可读。
+    整数结果给千分位整数；非整数 round 6 位后取最短往返表示——
+    :f 会在大数值上带出浮点尾差（如 172054171890.91 → ...910004）。"""
+    if value != value or value in (float("inf"), float("-inf")):
+        return str(value)
+    if value == int(value):
+        return f"{int(value):,}"
+    text = repr(round(value, 6))
+    if "e" in text or "E" in text:  # 极小值（<1e-4）repr 会用科学计数法
+        text = f"{value:.6f}".rstrip("0").rstrip(".")
+    whole, _, frac = text.partition(".")
+    return f"{int(whole):,}" + ("." + frac if frac else "")
+
+
 def _calculate(expression: str) -> dict:
     try:
         value = _eval(ast.parse(expression.strip(), mode="eval").body)
-        return {"content": f"{expression} = {round(value, 6):g}"}
+        return {"content": f"{expression} = {_format_number(value)}"}
     except Exception as e:  # noqa: BLE001
         return {"content": f"计算失败：{e}"}
 

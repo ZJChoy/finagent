@@ -7,6 +7,8 @@
 """
 from __future__ import annotations
 
+import hmac
+
 from fastapi import Header, HTTPException
 
 from ..config import settings
@@ -20,5 +22,5 @@ def require_admin(x_admin_token: str | None = Header(default=None)) -> None:
             detail="变更类接口已关闭（公网安全策略）：请在 .env 配置 ADMIN_TOKEN 后，"
                    "请求头携带 X-Admin-Token 重试",
         )
-    if x_admin_token != token:
+    if not hmac.compare_digest((x_admin_token or "").encode("utf-8"), token.encode("utf-8")):
         raise HTTPException(status_code=403, detail="X-Admin-Token 不匹配")
