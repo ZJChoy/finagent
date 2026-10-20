@@ -9,7 +9,7 @@ import json
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .. import db
 from ..agent import loop as agent_loop
@@ -19,7 +19,8 @@ router = APIRouter(prefix="/api", tags=["chat"])
 
 
 class ChatIn(BaseModel):
-    message: str
+    # 长度上限：一篇超长粘贴会让改写/预取/多轮工具全链路 token 爆炸
+    message: str = Field(min_length=1, max_length=8000)
     conversation_id: int | None = None
 
 
