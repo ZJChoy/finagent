@@ -7,13 +7,14 @@ from __future__ import annotations
 
 import json
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from .. import db
 from ..agent import loop as agent_loop
 from ..agent import memory
+from .security import require_admin
 
 router = APIRouter(prefix="/api", tags=["chat"])
 
@@ -52,7 +53,7 @@ def messages(cid: int):
 
 
 @router.delete("/conversations/{cid}")
-def delete_conversation(cid: int):
+def delete_conversation(cid: int, _admin: None = Depends(require_admin)):
     db.delete_conversation(cid)
     return {"ok": True, "deleted": cid}
 
