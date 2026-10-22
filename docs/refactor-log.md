@@ -151,4 +151,47 @@ reset 重建后行数可能恰好相同，行数校验挡不住内容错位。
 - [x] 依赖锁定 + Makefile
 - [ ] 20 题评测回归（与 M3 一起跑）
 
+---
+
+## M2 最小安全与演示形态 —— ✅ 全部完成
+
+### M2.1 前端管理口令流 ✅（commit fa337a2）
+
+修复 review 中确认的"设置 ADMIN_TOKEN 后配置页 100% 不可用"自相矛盾：
+- `app.js` 的 `api()` 对 POST/PUT/DELETE 自动带 `X-Admin-Token`
+  （sessionStorage，关浏览器即失效）；403 抛 `AdminRequiredError`，
+  `ensureAdminToken()` 就地 prompt 输入并重试一次；
+- config.html（保存/加删清记忆）、knowledge.html（上传/删文档）、
+  index.html（删会话，配合 M0.5）全页面接入。
+- 决策：sessionStorage 只防误触不防攻击——与 README 声明的 threat model 一致。
+
+### M2.2 DEMO_MODE 只读演示 ✅（commit 9cefb4e）
+
+`require_admin` 首先检查 `DEMO_MODE=1`：变更类接口一律 403（口令也不放行），
+问答与检索开放。公网隧道/录像专用。3 个新测试钉住契约。
+
+### M2.3 限流 + search 边界 ✅（commit 2da12b8）
+
+- `backend/api/ratelimit.py`：令牌桶按 `scope:IP`（X-Forwarded-For 优先），
+  `/api/chat` 10 桶/0.2 每秒回填、`/api/documents/search` 20 桶/0.5 回填，
+  超限 429 + Retry-After。
+- **实现期修了一个 off-by-one**：首请求创建满桶导致实际突发上限
+  capacity+1——改为首请求视为已消耗一个令牌（测试暴露后修复）。
+- `SearchIn` 收紧：`top_k ∈ [1,20]`（原 `top_k=-1` 会让切片返回近全库）、
+  `query ≤ 2000` 字。原实现完全无校验。
+
+### M2.4 请求 ID + 阶段日志 ✅（commit 1dc9f48）
+
+- `requestlog.py`：ContextVar 请求 ID + JSON 行 stdout；
+- chat 四类事件（start/tool_call/done/error），done 带延迟/token/引用数/拒答标记；
+- **隐私边界**：只落标量（长度/计数/耗时/错误类型），不落用户问题与回答原文。
+
+### M2 验收（含真实起服务冒烟）
+
+- [x] pytest 89/89 绿；ruff 0 error
+- [x] 冒烟（sqlite + 临时 DATA_DIR 起 uvicorn 8765）：`/health` 报索引一致性，
+  无 token 删除会话 403，`top_k=0` 422，正常检索 200
+- [x] 配置页/知识库页/对话页 403 → 口令输入闭环（静态语法检查通过）
+
+
 
