@@ -6,8 +6,14 @@
 
 **重排默认关闭**（`RERANK_ENABLED=1` 才开）—— 按定稿原则：先有评测数据，再决定它值不值。
 评测对比见 `eval/retrieval_report.md`。
+
+**相关性阈值**（M3.1，`RETRIEVAL_MIN_SCORE`，默认 0=关闭）：
+低于 MIN_SCORE 的块直接丢弃——检索"永远返回 top-k"曾让无关内容被当成依据注入。
+阈值由金标分布标定（scripts/threshold_calibrate.py），不是拍的。
 """
 from __future__ import annotations
+
+import os
 
 from finagent.core.appconfig import settings
 
@@ -15,6 +21,11 @@ from . import embedder, rerank, store
 
 CANDIDATES = 30
 TOP_K = 5
+# 相关性下限（M3.1）：低于此分的块不算"依据"。标定：eval/retrieval_questions.yaml
+# 20 题金标块分数 p10=0.6736（保留 90% 金标、拦截 78% 召回线以下噪声），
+# 详见 scripts/threshold_calibrate.py 与 eval/threshold-report.md。
+# 取 0 下方可整体关闭（RETRIEVAL_MIN_SCORE=0 时不启用阈值）。
+MIN_SCORE = float(os.getenv("RETRIEVAL_MIN_SCORE", "0.0") or 0.0)
 
 
 def retrieve(
@@ -34,9 +45,18 @@ def retrieve(
     if settings.RERANK_ENABLED and len(hits) > top_k:
         order, ok = rerank.rerank(query, [h["text"] for h in hits], top_n=top_k)
         if ok:
-            return [hits[i] for i in order][:top_k]
+            hits = [hits[i] for i in order][:top_k]
         # 重排失败就退回向量顺序 —— 质量可以退化，链路不能断
-    return hits[:top_k]
+
+    hits = hits[:top_k]
+    return _apply_min_score(hits)
+
+
+def _apply_min_score(hits: list[dict]) -> list[dict]:
+    """MIN_SCORE>0 时丢弃低于阈值的块（供测试直接覆盖模块变量验证行为）。"""
+    if MIN_SCORE <= 0:
+        return hits
+    return [h for h in hits if h.get("score", 0) >= MIN_SCORE]
 
 
 def citations_of(hits: list[dict]) -> list[dict]:
