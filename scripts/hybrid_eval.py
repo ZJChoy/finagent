@@ -131,7 +131,7 @@ def main() -> None:
             rrf[key] = rrf.get(key, 0) + 1 / (k_rrf + rank + 1)
         hyb_keys = [k for k, _ in sorted(rrf.items(), key=lambda x: -x[1])[:MRR_K]]
 
-        def _pass_and_mrr(keys: list[str], pass_acc: str, mrr_acc: str) -> None:
+        def _pass_and_mrr(keys: list[str], pass_acc: str, mrr_acc: str, gkeys=gkeys) -> None:
             hit_rank = next((i + 1 for i, k in enumerate(keys[:K]) if k in gkeys), None)
             if hit_rank:
                 stats[pass_acc] += 1
