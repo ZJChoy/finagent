@@ -1,8 +1,9 @@
 """变更类接口的管理口令校验（D10 安全决策：公网暴露下 fail-closed）。
 
 规则：
+- `.env` 设 `DEMO_MODE=1` 时**只读演示**：所有变更类接口一律 403（口令也不放行）；
 - `.env` 配置 ADMIN_TOKEN 后，变更类接口（PUT/POST/DELETE）要求请求头 `X-Admin-Token` 匹配；
-- **未配置 ADMIN_TOKEN 时默认拒绝**——公网环境下配置页/删文档/清记忆裸奔等于送权限；
+- 未配置 ADMIN_TOKEN 时默认拒绝——公网环境下配置页/删文档/清记忆裸奔等于送权限；
 - 查询类接口（GET、/api/chat）不受影响，保持演示开放。
 """
 from __future__ import annotations
@@ -15,6 +16,11 @@ from ..config import settings
 
 
 def require_admin(x_admin_token: str | None = Header(default=None)) -> None:
+    if settings.DEMO_MODE:
+        raise HTTPException(
+            status_code=403,
+            detail="只读演示模式（DEMO_MODE=1）：变更类接口已关闭，问答与检索不受影响",
+        )
     token = getattr(settings, "ADMIN_TOKEN", None)
     if not token:
         raise HTTPException(

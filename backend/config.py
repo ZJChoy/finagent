@@ -115,6 +115,8 @@ class Settings:
         return self.DATA_DIR.resolve() == (BASE_DIR / "data").resolve()
     # 变更类接口（改配置/删文档/清记忆）的管理口令：公网部署必须设置（fail-closed）
     ADMIN_TOKEN: str | None = os.getenv("ADMIN_TOKEN")
+    # 只读演示模式：公网隧道/录像时开启，上传/改配置/写记忆全部 403，问答与检索保持开放
+    DEMO_MODE: bool = os.getenv("DEMO_MODE", "0") == "1"
 
     @property
     def llm_ready(self) -> bool:

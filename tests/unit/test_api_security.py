@@ -56,3 +56,28 @@ class TestOtherChangeEndpoints:
     def test_read_endpoints_open(self):
         """查询类保持开放（演示定位，README 已声明）。"""
         assert client.get("/api/conversations").status_code == 200
+
+
+class TestDemoMode:
+    """只读演示模式（M2.2）：DEMO_MODE=1 时变更类接口一律 403，口令也不放行。"""
+
+    def test_demo_mode_blocks_even_with_token(self, monkeypatch):
+        from backend.config import settings
+        monkeypatch.setattr(settings, "DEMO_MODE", True)
+        r = client.put("/api/config", headers={"X-Admin-Token": TOKEN}, json={})
+        assert r.status_code == 403
+        assert "DEMO_MODE" in r.json()["detail"]
+
+    def test_demo_mode_keeps_reads_open(self, monkeypatch):
+        from backend.config import settings
+        monkeypatch.setattr(settings, "DEMO_MODE", True)
+        assert client.get("/api/conversations").status_code == 200
+        assert client.get("/api/config").status_code == 200
+
+    def test_demo_mode_blocks_chat_delete(self, monkeypatch):
+        from backend.config import settings
+        from backend import db
+        cid = db.create_conversation("demo")
+        monkeypatch.setattr(settings, "DEMO_MODE", True)
+        r = client.delete(f"/api/conversations/{cid}", headers={"X-Admin-Token": TOKEN})
+        assert r.status_code == 403
