@@ -19,6 +19,7 @@ os.environ["FIN_CACHE_ENABLED"] = "0"
 # store.py 有模块级常量依赖 appconfig（INDEX_DIR 等），
 # 测试在 import 前必须完成 configure（与 backend.rag 的顺序契约一致）
 import sys as _sys  # noqa: E402
+
 _sys.path.insert(0, str(ROOT))
 from backend import dbconn as _dbconn  # noqa: E402
 from backend.config import settings as _settings  # noqa: E402
