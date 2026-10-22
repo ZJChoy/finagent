@@ -14,7 +14,6 @@ openai
 
 # PDF 解析
 pypdf
-pdfplumber
 
 # 数值计算
 numpy

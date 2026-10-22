@@ -5,3 +5,7 @@ __pycache__/
 .venv/
 .env
 .idea/
+# 评测/工具运行产物（demo_state、断点库等本地生成物）
+.pytest_cache/
+.pytest_tmp/
+*.sqlite
