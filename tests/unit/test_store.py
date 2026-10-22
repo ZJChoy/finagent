@@ -22,8 +22,9 @@ def index_env(tmp_path, monkeypatch):
 
     monkeypatch.setattr(store, "INDEX_DIR", tmp_path)
     monkeypatch.setattr(store, "VEC_PATH", tmp_path / "vectors.npy")
-    # 元数据在共享库的 rag_chunks 表里，row_id 必须每个用例独立，否则串台
-    monkeypatch.setattr(app_settings, "DB_PATH", tmp_path / "app.db")
+    # 元数据在共享库的 rag_chunks 表里，row_id 必须每个用例独立，否则串台。
+    # DB_PATH 是 property，改 DATA_DIR 即可让 sqlite 落到临时目录。
+    monkeypatch.setattr(app_settings, "DATA_DIR", tmp_path)
     monkeypatch.setattr(dbconn, "IS_MYSQL", False)
     store.init()
     yield tmp_path

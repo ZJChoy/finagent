@@ -94,11 +94,25 @@ class Settings:
 
     # ---- 路径 ----
     BASE_DIR: Path = BASE_DIR
-    # 多实例隔离：第二实例用 DATA_DIR=data-announce 启动，即得独立语料/索引/库
+    # 多实例隔离：第二实例用 DATA_DIR=data-announce 启动，即得独立语料/索引/库。
+    # ⚠️ RAW_DIR 必须跟着 DATA_DIR 走：原来硬编码 data/raw，第二实例上传的 PDF
+    # 会落进主实例语料目录（实测确认过这一串数据路径）。
+    # RAW_DIR/DB_PATH 做成 property（而非类属性）才能跟随实例级的 DATA_DIR 覆盖。
     DATA_DIR: Path = Path(os.getenv("DATA_DIR") or (BASE_DIR / "data"))
-    RAW_DIR: Path = BASE_DIR / "data" / "raw"
     FRONTEND_DIR: Path = BASE_DIR / "frontend"
-    DB_PATH: Path = DATA_DIR / "app.db"
+
+    @property
+    def RAW_DIR(self) -> Path:
+        return self.DATA_DIR / "raw"
+
+    @property
+    def DB_PATH(self) -> Path:
+        return self.DATA_DIR / "app.db"
+
+    @property
+    def is_default_data_dir(self) -> bool:
+        """DATA_DIR 是否为默认值（多实例隔离的判断依据）。"""
+        return self.DATA_DIR.resolve() == (BASE_DIR / "data").resolve()
     # 变更类接口（改配置/删文档/清记忆）的管理口令：公网部署必须设置（fail-closed）
     ADMIN_TOKEN: str | None = os.getenv("ADMIN_TOKEN")
 
@@ -110,6 +124,15 @@ class Settings:
 
     def ensure_dirs(self) -> None:
         self.RAW_DIR.mkdir(parents=True, exist_ok=True)
+        # MySQL + 非默认 DATA_DIR 的组合会串库：MySQL 的库名不随 DATA_DIR 变，
+        # 两个实例共写同一张 rag_chunks 表、各自维护不同的向量文件 → 索引必然错乱
+        #（实测：公告实例入库直接撞主实例主键）。sqlite 无此问题（DB_PATH 随 DATA_DIR）。
+        if (self.DB_BACKEND or "sqlite").lower() == "mysql" and not self.is_default_data_dir:
+            raise RuntimeError(
+                f"MySQL 后端不支持多实例隔离：DATA_DIR={self.DATA_DIR} 但 MySQL 库仍是"
+                f"「{self.MYSQL_DATABASE}」，两个实例会共写同一张表导致索引错乱。"
+                "请改用 sqlite，或为第二实例单独建 MySQL 库并设 MYSQL_DATABASE。"
+            )
 
 
 settings = Settings()
