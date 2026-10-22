@@ -9,7 +9,7 @@
 """
 from __future__ import annotations
 
-from typing import Generator
+from collections.abc import Generator
 
 from finagent.core.runtime import AgentEngine
 
@@ -17,7 +17,9 @@ from .. import llm, tools
 from ..config import settings
 from ..rag import retriever
 from . import context as ctx
-from . import gate, grounding as gnd, rewrite as rewriter
+from . import gate
+from . import grounding as gnd
+from . import rewrite as rewriter
 from .prompts import build_messages
 
 

@@ -4,14 +4,14 @@
 """
 from __future__ import annotations
 
-import sys
 from pathlib import Path
+
+from backend import dbconn, llm  # noqa: F401
 
 # ⚠️ 顺序契约：appconfig.configure 必须先于 finagent.core.retriever 导入
 #（store.py 有模块级常量依赖 DATA_DIR/DIALECT，见 finagent/core/appconfig.py）
 # backend.llm 负责把 API Key 绑定到 core.llm（llmctx 索引的上下文标注需要）
 from backend.config import settings
-from backend import dbconn, llm  # noqa: F401
 from finagent.core.appconfig import configure
 
 configure(settings, DIALECT=dbconn.DIALECT, dbconn=dbconn)

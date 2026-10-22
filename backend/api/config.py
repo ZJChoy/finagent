@@ -4,13 +4,13 @@
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
-from .security import require_admin
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from .. import db
 from ..config import settings
 from ..tools import all_tools, catalogs
+from .security import require_admin
 
 router = APIRouter(prefix="/api/config", tags=["config"])
 

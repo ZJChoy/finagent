@@ -1,11 +1,11 @@
 """长期记忆接口（L4）—— 纪律：记忆必须**可见可删**。"""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
-from .security import require_admin
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from .. import db
+from .security import require_admin
 
 router = APIRouter(prefix="/api/memories", tags=["memories"])
 

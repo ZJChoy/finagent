@@ -386,7 +386,7 @@ def main() -> None:
         "",
         "## 三、逐题对比",
         "",
-        f"| 题号 | 问题 | 池 | 相关 | " + " | ".join(f"{n} recall" for n in names) + " | 改写后的检索词 |",
+        "| 题号 | 问题 | 池 | 相关 | " + " | ".join(f"{n} recall" for n in names) + " | 改写后的检索词 |",
         "|---" * (len(names) + 4) + "|",
     ]
     for r in per_q:

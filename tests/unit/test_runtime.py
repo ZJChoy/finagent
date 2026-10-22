@@ -7,10 +7,9 @@ calculate 无论成败都不产生接地证据。
 """
 from types import SimpleNamespace
 
-import backend.tools  # noqa: F401  注册领域工具
 import backend.agent.context as ctx
+import backend.tools  # noqa: F401  注册领域工具
 from finagent.core.runtime import AgentEngine
-
 
 SETTINGS = SimpleNamespace(
     MAX_MODEL_CALLS=3, MAX_OUTPUT_TOKENS=100, TOOL_RESULT_MAX_CHARS=2400,
@@ -66,13 +65,21 @@ class TestGroundingGate:
         end, _ = _run(_engine(FakeLLM("calculate", '{"expression": "1+1"}')))
         assert end.get("grounded") is False
 
-    def test_failed_search_is_not_evidence(self):
-        """检索工具异常（registry 转成 ok=False）同样不构成证据。"""
+    def test_empty_search_is_not_evidence(self):
+        """检索命中为空（ok=True 但无引用）不构成证据——空知识库不该放行幻觉。"""
         end, _ = _run(_engine(FakeLLM("search_knowledge", '{"query": "bad"}')))
         assert end.get("ungrounded") is True
 
     def test_successful_search_is_evidence(self):
-        end, _ = _run(_engine(FakeLLM("search_knowledge", '{"query": "分红"}')))
+        """有引用的检索成功 → 接地成立。用假工具注入 citations，不依赖真实索引。"""
+        from finagent.core import tools as core_tools
+        core_tools.register(core_tools.Tool(
+            name="_fake_search_hit", description="测试", group="测试",
+            parameters={"type": "object", "properties": {}},
+            func=lambda: {"ok": True, "content": "【片段 1】净利润 100 亿",
+                          "citations": [{"no": 1, "doc": "x.pdf", "page": 1, "seq": 0, "score": 0.9}]},
+        ))
+        end, _ = _run(_engine(FakeLLM("_fake_search_hit", "{}")))
         assert end.get("grounded") is True
         assert end.get("ungrounded") is False
 

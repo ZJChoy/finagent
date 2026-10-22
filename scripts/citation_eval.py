@@ -62,7 +62,7 @@ def _judge(q: dict, m: dict) -> tuple[str, bool]:
         return ("✅ 正确拒答" if hit else "❌ 未拒答（编造风险）"), hit
     if q.get("metric") == "value":
         # 数值一致性：金标值（年报原文提取）出现在答案中，且无可疑引用
-        hit = any(v in m["answer"] for v in q.get("gold_values", [])) and not m.get("citations") is None
+        hit = any(v in m["answer"] for v in q.get("gold_values", [])) and m.get("citations") is not None
         return ("✅ 数值一致" if hit else "❌ 数值不一致/未引用"), hit
     # 可接受出处列表：同一内容可有多个等价出处（两版年报、概述/分部），逐一比对
     acceptable = q.get("acceptable") or [{"doc": q.get("gold_doc"), "page": q.get("gold_page")}]

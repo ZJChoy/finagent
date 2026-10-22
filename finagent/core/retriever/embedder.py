@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from finagent.core.appconfig import settings
+
 from ..llm import client
 
 DEFAULT_BATCH = 16

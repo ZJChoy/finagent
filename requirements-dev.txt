@@ -1,0 +1,4 @@
+# 开发与测试依赖（CI 与本地跑 pytest / ruff 用）
+pytest>=8.0
+ruff>=0.5
+httpx>=0.27

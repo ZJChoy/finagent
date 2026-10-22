@@ -7,9 +7,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from backend.config import settings
 from finagent.core.evaluator import run_suite
 
-from backend.config import settings
 from .main import ask
 
 QUESTIONS = [

@@ -8,6 +8,8 @@ from __future__ import annotations
 from finagent.core.context import (  # noqa: F401
     estimate_tokens,
     total_tokens,
+)
+from finagent.core.context import (
     trim_tool_result as _core_trim,
 )
 

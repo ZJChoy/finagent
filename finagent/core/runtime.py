@@ -21,7 +21,7 @@ from __future__ import annotations
 import json
 import re
 import time
-from typing import Callable, Generator
+from collections.abc import Callable, Generator
 
 
 def _shift_numbers(content: str, count: int, offset: int) -> str:

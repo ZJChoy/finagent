@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 import statistics
-from typing import Callable
+from collections.abc import Callable
 
 REFUSE_HINTS = (
     "未找到", "无法回答", "没有找到", "未披露", "无法预测", "不能预测", "不构成",

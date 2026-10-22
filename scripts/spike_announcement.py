@@ -70,7 +70,8 @@ def main() -> None:
     print("  ✅ 是合法 PDF")
 
     print("\n=== 4. 用 FinAgent 已有能力解析正文 ===")
-    out = Path("data/spike"); out.mkdir(parents=True, exist_ok=True)
+    out = Path("data/spike")
+    out.mkdir(parents=True, exist_ok=True)
     pdf_path = out / f"{ann_id}.pdf"
     pdf_path.write_bytes(blob)
     try:

@@ -1,8 +1,8 @@
 """公告问答实例的领域工具：注册进框架注册表（本进程独立，不与财报实例混跑）。"""
 from __future__ import annotations
 
-from finagent.core.tools import Tool, register
 from finagent.core.retriever import retriever
+from finagent.core.tools import Tool, register
 
 
 def query_announcements(query: str, top_k: int = 5) -> dict:

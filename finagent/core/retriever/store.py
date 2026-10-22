@@ -24,7 +24,6 @@ from typing import Any
 
 import numpy as np
 
-
 from finagent.core.appconfig import settings
 
 INDEX_DIR: Path = settings.DATA_DIR / "index" / settings.DIALECT

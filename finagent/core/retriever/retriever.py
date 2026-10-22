@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 from finagent.core.appconfig import settings
+
 from . import embedder, rerank, store
 
 CANDIDATES = 30

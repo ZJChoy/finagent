@@ -86,7 +86,7 @@ def load_pdf(path: str | Path) -> LoadResult:
     raw_pages: list[list[str]] = []
     for page in reader.pages:
         text = page.extract_text() or ""
-        raw_pages.append([l for l in (_norm(x) for x in text.split("\n")) if l])
+        raw_pages.append([ln for ln in (_norm(x) for x in text.split("\n")) if ln])
 
     result = LoadResult(total_pages=len(raw_pages))
     result.empty_pages = sum(
@@ -99,7 +99,7 @@ def load_pdf(path: str | Path) -> LoadResult:
         body = list(lines)
 
         # 1) 移除页眉/页脚
-        body = [l for l in body if l not in repeated]
+        body = [ln for ln in body if ln not in repeated]
 
         # 2) 从首尾找页码行 → 抽成 metadata 并从正文移除
         #    （实测：茅台的页码在页首 "60 / 143"，美的在页首 "- 59 -"）
@@ -112,7 +112,7 @@ def load_pdf(path: str | Path) -> LoadResult:
             n = _match_page_number(line)
             if n is not None:
                 printed = n
-                body = [l for l in body if l != line]
+                body = [ln for ln in body if ln != line]
                 break
 
         # 3) 兜底：有些年报的页码是页首一个光秃数字（如美的的 "59"）。

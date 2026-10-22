@@ -3,7 +3,6 @@
 契约：result["ok"] 必须由工具显式给出；registry.call 对缺失 ok 的返回
 默认 False——失败要显式声明成功，而不是成功要显式声明失败。
 """
-import pytest
 
 import backend.tools  # noqa: F401  触发工具注册
 from finagent.core import tools as core_tools

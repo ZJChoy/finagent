@@ -11,12 +11,11 @@ from __future__ import annotations
 
 import sys
 
-from finagent.core.runtime import AgentEngine
-
 from backend import llm, tools
 from backend.agent import context as ctx
 from backend.config import settings
 from backend.rag import retriever
+from finagent.core.runtime import AgentEngine
 
 from . import tools_impl  # noqa: F401  导入即注册公告工具
 from .prompts import build_messages

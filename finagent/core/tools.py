@@ -6,8 +6,9 @@ Agent loop 只依赖这里导出的 openai_specs / get / catalogs。
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 
 @dataclass

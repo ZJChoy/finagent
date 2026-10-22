@@ -10,4 +10,18 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["finagent", "finagent.core"]
+packages = ["finagent", "finagent.core", "finagent.core.retriever"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+# 起步只开稳定的基础集 + 排序/未用导入；E501（行长）交给 line-length，
+# BLE001/S110 这类"宽 except"在本项目是刻意的降级策略，不拦。
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/*" = ["E402"]   # 脚本先 sys.path 再 import，是有意的
+"tests/*" = ["E402"]

@@ -8,7 +8,6 @@ import pytest
 from backend.agent.gate import needs_grounding, needs_snapshot
 from backend.agent.grounding import resolve_symbol
 
-
 HITS_MOUTAI = [{"doc": "600519_2025_annual.PDF", "text": "证券代码：600519", "page": 1, "seq": 0, "score": 0.9}]
 HITS_ILI = [{"doc": "000858_伊利股份_2025年年度报告.PDF", "text": "...", "page": 1, "seq": 0, "score": 0.9}]
 

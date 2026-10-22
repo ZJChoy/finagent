@@ -15,9 +15,8 @@ from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from finagent.core.runtime import AgentEngine  # noqa: E402
 from finagent.core import tools as core_tools  # noqa: E402
-
+from finagent.core.runtime import AgentEngine  # noqa: E402
 
 # ---- 假工具：记录被调用次数 ----
 CALLS: list[dict] = []
@@ -125,7 +124,6 @@ def main() -> int:
     tr = end["tool_calls"][0]
     ok &= check("trace ok=False 且带 parse_error 标记", tr["ok"] is False and tr.get("parse_error") is True)
     ok &= check("错误含定位信息（msg/pos）", "不是合法 JSON" in tr["result"])
-    tool_msgs = [m for m in [] ]  # placeholder（messages 在引擎内部，改用事件断言）
     fb = [e for e in events if e["type"] == "tool_result" and "未执行" in e["content"]]
     ok &= check("tool_result 事件带自修指令", bool(fb) and "重新调用" in fb[0]["content"])
     ok &= check("最终回答正常产出", end["content"] == "已按修正后的参数重查完成")

@@ -7,11 +7,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from .security import require_admin
 from pydantic import BaseModel
 
 from ..config import settings
 from ..rag import ingest, retriever, store
+from .security import require_admin
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -53,9 +53,9 @@ def upload(file: UploadFile = File(...), chunk_size: int = 500, overlap: int = 9
     try:
         result = ingest.ingest_pdf(target, chunk_size=chunk_size, overlap=overlap)
     except ingest.ScannedPDFError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(500, f"入库失败：{type(e).__name__}: {e}")
+        raise HTTPException(500, f"入库失败：{type(e).__name__}: {e}") from e
     return result
 
 
