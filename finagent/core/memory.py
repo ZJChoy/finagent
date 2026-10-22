@@ -34,14 +34,22 @@ class SessionMemory:
         self._extracted: set[tuple[int, int]] = set()  # (conv_id, user_msg_count) 已提炼过
 
     def _params(self) -> tuple[bool, int, int, int]:
-        """从配置存储读记忆策略参数：返回 (是否启用, 保留条数, 压缩阈值, 提炼间隔)。"""
+        """从配置存储读记忆策略参数：返回 (是否启用, 保留条数, 压缩阈值, 提炼间隔)。
+
+        ⚠️ 用 is None 判断而非 `or`：keep_recent=0（全部压缩）是合法配置，
+        `0 or KEEP_RECENT` 会把用户设置吞掉换成默认值。
+        """
         try:
             cfg = self._db.get_config()
         except Exception:  # noqa: BLE001
             return True, KEEP_RECENT, SUMMARIZE_AT, EXTRACT_EVERY
+
+        # keep_recent 允许 0（全部压缩）；summarize_at / extract_every 的 0 无意义
+        keep = cfg.get("memory_keep_recent")
+        keep = KEEP_RECENT if keep is None else int(keep)
         return (
             bool(cfg.get("memory_enabled", True)),
-            int(cfg.get("memory_keep_recent") or KEEP_RECENT),
+            keep,
             int(cfg.get("memory_summarize_at") or SUMMARIZE_AT),
             int(cfg.get("memory_extract_every") or EXTRACT_EVERY),
         )
