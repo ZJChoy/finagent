@@ -1,0 +1,18 @@
+# 锁定版本（requirements.txt 的直接依赖；本机 2026-10 实测组合，python 3.12）
+# 升级时先跑 tests/ 与 20 题评测，通过后改这里。
+fastapi==0.150.0
+uvicorn[standard]==0.54.0
+python-multipart==0.0.32
+python-dotenv==1.2.4
+PyMySQL==1.2.3
+openai==3.35.1
+pypdf==6.21.1
+numpy==2.5.4
+akshare==1.19.1
+pandas==3.0.6
+pyyaml==6.0.3
+
+# 开发/测试
+pytest==9.1.1
+ruff==0.17.1
+httpx==0.28.1
