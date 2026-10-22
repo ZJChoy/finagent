@@ -3,7 +3,6 @@
 行为：MIN_SCORE>0 时低于阈值的块不返回；全低 → 空列表 → 上层走"无依据"拒答。
 默认 0（关闭）——阈值必须由标定数据支持后才开（README 原则：先评测再启用）。
 """
-import pytest
 
 from finagent.core.retriever import retriever
 
