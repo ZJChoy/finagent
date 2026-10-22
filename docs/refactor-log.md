@@ -89,5 +89,66 @@
 
 - [x] pytest 67/67 绿，1.2s，离线
 - [x] ruff 0 error
-- [x] 20 题评测回归 → **待跑**（需要 API key 与网络，见下方"待办"）
+- [ ] 20 题评测回归 → 推迟到 M1 完成后与 M3 前基线一起跑（避免重复消耗 API 额度）
+
+---
+
+## M1 一致性与复现 —— ✅ 全部完成
+
+### M1.1 索引变体失效机制 ✅（commit 934889a）
+
+**根因链**（review 实测复现）：读索引走变体（`RETRIEVAL_INDEX=llmctx`），写索引
+只写 base → 上传后变体行数落后，`search` 越界（被 preflight 吞成"静默失效"）；
+删除后 row_id 重排、变体没重排 → 向量与文本**静默错配**（正常返回错内容）；
+reset 重建后行数可能恰好相同，行数校验挡不住内容错位。
+
+**修法**（失效回退而非自动重建——重建要逐块调 LLM，成本高、失败面大）：
+- 每个变体文件配 `.fp` 指纹侧车：`行数:row_id,列表`。写入路径
+  （add/delete/reset）后指纹自然过期；
+- `active_vector_path()` 校验「变体存在 + 行数一致 + 指纹一致」，不满足回退
+  base——质量可以退化，错位绝不允许；
+- `index_health()` 挂进 `/health`：`meta_rows / base_rows / consistent /
+  active_variant / variant_rows / stale_variants`；
+- `scripts/index_doctor.py`：体检 + `--stamp` 给存量同批变体补登记指纹；
+- `scripts/contextual_index.py` 两个 build 入口写完即登记指纹。
+
+**关键决策**：指纹用 `行数:row_id 列表` 而不是纯行数——reset 后重建时行数
+可能恰好相同（行数校验测试确实漏过了这种错位），row_id 列表能区分
+"同一批切块"与"不同切块"。
+
+**存量迁移**：本机 llmctx（2104 行，与元数据一致）已 `--stamp` 登记并恢复生效。
+
+### M1.2 多实例隔离 ✅（commit a00c1a9）
+
+- `RAW_DIR` 从硬编码 `data/raw` 改为 property 跟随 `DATA_DIR`（原实现第二实例
+  上传的 PDF 会落进主实例语料目录）；`DB_PATH` 同理。
+- **MySQL + 非默认 DATA_DIR 组合在启动时直接拒绝**（`ensure_dirs` raise）：
+  MySQL 库名不随 DATA_DIR 变，两实例共写一张 `rag_chunks` 表、各自维护不同
+  `.npy` → 索引必然错乱。review 时实测公告实例入库撞主实例主键才暴露。
+- sqlite 不受影响（DB_PATH 随 DATA_DIR，天然隔离）。
+- 测试：`test_config_paths.py` 5 用例。
+
+### M1.3 依赖锁定 + Makefile ✅（commit 0ff95f2）
+
+- `requirements.lock`：本机实测组合（fastapi 0.150.0 / uvicorn 0.54.0 /
+  openai 3.35.1 / numpy 2.5.4 / akshare 1.19.1 等），逐包核对过安装版本。
+- `make bootstrap / serve / test / lint / eval / doctor`。
+- 复现路径：clone → 配 `.env` → `make bootstrap` → `make serve`。
+
+### M1.4 启动自检 ✅（commit 2f8e1b7）
+
+- base 与元数据行数不一致 → **FATAL 拒绝启动**（exit 2）：带着错位索引服务
+  必然答错，比宕机更糟的是静默答错。实测坏索引启动被拦截。
+- stale 变体 / 未配置 API key / 公网绑定无 ADMIN_TOKEN → WARN（stderr，JSON）。
+- 全部结构化 JSON 输出，公网部署可 grep。
+
+### M1 验收
+
+- [x] pytest 79/79 绿；ruff 0 error
+- [x] 上传/删除文档后检索永不越界、永不静默错配（7 个 store 用例覆盖）
+- [x] `/health` 报索引一致性
+- [x] 第二实例 sqlite 隔离成立；MySQL 组合拒绝启动
+- [x] 依赖锁定 + Makefile
+- [ ] 20 题评测回归（与 M3 一起跑）
+
 
