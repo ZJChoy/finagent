@@ -5,6 +5,9 @@
 """
 from __future__ import annotations
 
+import json
+import sys
+
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -28,6 +31,55 @@ app.include_router(api_stats.router)
 
 db.init()
 store.init()
+
+
+def _startup_check() -> None:
+    """启动自检：只警告不阻断（除索引损坏——带着坏索引服务必然答错）。
+
+    输出结构化 JSON 到 stdout，便于公网部署时 grep。
+    """
+    problems: list[str] = []
+
+    ping = dbconn.ping()
+    if not ping.get("ok"):
+        problems.append(f"数据库不可达：{ping.get('error')}")
+
+    facts = store.index_health()
+    if not facts["consistent"]:
+        # fail-closed：base 向量与元数据行数不一致 = 检索必然错位，拒绝带病启动
+        print(json.dumps({
+            "level": "FATAL",
+            "check": "index",
+            "message": (
+                f"向量索引与元数据不一致（base {facts['base_rows']} 行 vs 元数据 "
+                f"{facts['meta_rows']} 行）。检索会答错，拒绝启动。"
+                "请运行 scripts/index_doctor.py 体检，或 reset 后重新入库。"
+            ),
+            "index": facts,
+        }, ensure_ascii=False), file=sys.stderr)
+        raise SystemExit(2)
+    if facts["stale_variants"]:
+        problems.append(
+            f"索引变体已过期（{facts['stale_variants']}），已自动回退 base。"
+            "如需恢复变体，重建后运行 scripts/index_doctor.py --stamp。"
+        )
+
+    if not settings.llm_ready:
+        problems.append("未配置 DASHSCOPE_API_KEY——对话不可用，其余功能正常。")
+
+    host = (settings.HOST or "127.0.0.1").lower()
+    if host in ("0.0.0.0", "::") and not settings.ADMIN_TOKEN:
+        problems.append(
+            "HOST 绑定到公网地址但未设置 ADMIN_TOKEN：变更类接口已 fail-closed（403），"
+            "但仍建议配置以启用知识库管理。"
+        )
+
+    for p in problems:
+        print(json.dumps({"level": "WARN", "check": "startup", "message": p},
+                         ensure_ascii=False), file=sys.stderr)
+
+
+_startup_check()
 
 
 @app.get("/health")
