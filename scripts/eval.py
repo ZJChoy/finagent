@@ -99,7 +99,10 @@ def main() -> None:
     ap.add_argument("--limit", type=int, default=0)
     args = ap.parse_args()
 
-    qs = yaml.safe_load(Path(args.questions).read_text(encoding="utf-8"))["questions"]
+    data = yaml.safe_load(Path(args.questions).read_text(encoding="utf-8"))
+    qs = list(data.get("questions") or [])
+    if data.get("questions_ext"):
+        qs += list(data["questions_ext"])  # M3.3 扩展集（Q21+）默认并入
     if args.limit:
         qs = qs[: args.limit]
 
