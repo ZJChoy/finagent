@@ -7,14 +7,14 @@
 ![FastAPI](https://img.shields.io/badge/%E5%90%8E%E7%AB%AF-FastAPI%20%2B%20SSE-009688?logo=fastapi\&logoColor=white)
 ![Storage](https://img.shields.io/badge/%E5%AD%98%E5%82%A8-SQLite%20%7C%20MySQL-4479A1?logo=sqlite\&logoColor=white)
 ![CI](https://github.com/ZJChoy/finagent/actions/workflows/ci.yml/badge.svg)
-![Tests](https://img.shields.io/badge/pytest-96%20%E7%94%A8%E4%BE%8B-3B6D11)
+![Tests](https://img.shields.io/badge/pytest-100%20%E7%94%A8%E4%BE%8B-3B6D11)
 
 单机运行 · 只读公开数据 · 不构成投资建议
 
 📄 深入阅读：[架构说明](docs/architecture.md) · [Prompt 策略](docs/prompt-strategy.md) · [踩坑记录](docs/pitfalls.md) · [评测结果](eval/results-m4-notes.md) · [检索实验](eval/retrieval_report.md) · [阈值标定](eval/threshold-report.md) · [混合检索评估](eval/hybrid-report.md) · [改造记录](docs/refactor-log.md) · [运营记录](docs/ops-log.md) · [PRD](PRD.md)
 
 **当前状态**：三容器部署（app / mysql / cloudflared 隧道）；**40 题端到端评测自动初判 33/40**（20 题旧集沿用历史 20/20；扩集含攻击/边界/回归类，2 个已知边界如实记录，见 [评测记录](eval/results-m4-notes.md)）；  
-**96 个离线单测 + CI**（ruff + pytest，Python 3.11/3.12）；检索经 **8 档对比实验**优化（MRR +16%）+ **相关性阈值标定**；  
+**100 个离线单测 + CI**（ruff + pytest，Python 3.11/3.12）；检索经 **8 档对比实验**优化（MRR +16%）+ **相关性阈值标定**；  
 首轮**真实用户 30 题公网测试**的 3 项严重缺陷全部修复（见 [ops-log](docs/ops-log.md)）。
 
 ---
@@ -118,7 +118,7 @@ make serve          # 起服务 http://127.0.0.1:8000
 其它常用命令：
 
 ```bash
-make test      # 96 个离线单测（不需要 API key，约 2s）
+make test      # 100 个离线单测（不需要 API key，约 2s）
 make lint      # ruff 检查
 make eval      # 40 题端到端评测（需服务在跑）
 make doctor    # 索引一致性体检（含 stale 变体与 --stamp 指纹登记）

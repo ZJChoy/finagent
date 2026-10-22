@@ -6,7 +6,7 @@
 
 ## 最终状态（2026-10-22，M0–M4 完成）
 
-- **测试**：96 个离线单测全绿（约 2s），CI（GitHub Actions：ruff + pytest，3.11/3.12 矩阵）
+- **测试**：100 个离线单测全绿（约 2s），CI（GitHub Actions：ruff + pytest，3.11/3.12 矩阵）
 - **Lint**：ruff 0 error
 - **评测**：40 题端到端基线 33/40 自动初判（含 11 道设计内拒答题）；
   评测驱动的两轮修复均有复测记录；2 个已知边界如实记录
@@ -268,7 +268,7 @@ Windows GBK stdout 崩在 `✅` 字符（`PYTHONIOENCODING=utf-8` 修复）。
 
 ### M4.1 README 更新 ✅（commit cd7a92a）
 
-- badge：CI（GitHub Actions）+ 96 测试；状态行更新为 40 题基线；
+- badge：CI（GitHub Actions）+ 100 测试；状态行更新为 40 题基线；
 - 快速开始改为 `make bootstrap / serve / test / eval / doctor`；
 - 评测节补 4 个新脚本；已知边界更新（阈值重叠、混合检索暂不上线）。
 
@@ -284,7 +284,7 @@ Windows GBK stdout 崩在 `✅` 字符（`PYTHONIOENCODING=utf-8` 修复）。
 
 ## 简历素材摘要（改造产生的可验证数字）
 
-- **96 个离线单测**（ruff + pytest + GitHub Actions CI，Python 3.11/3.12），覆盖
+- **100 个离线单测**（ruff + pytest + GitHub Actions CI，Python 3.11/3.12），覆盖
   接地门控、工具契约、实体守卫、索引一致性、限流、鉴权；测试先行——13 个
   失败用例即 6 个 P0 缺陷清单；
 - **索引变体失效机制**：指纹侧车 + 行数校验，写入路径与读路径解耦导致的
