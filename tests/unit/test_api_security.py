@@ -75,8 +75,8 @@ class TestDemoMode:
         assert client.get("/api/config").status_code == 200
 
     def test_demo_mode_blocks_chat_delete(self, monkeypatch):
-        from backend.config import settings
         from backend import db
+        from backend.config import settings
         cid = db.create_conversation("demo")
         monkeypatch.setattr(settings, "DEMO_MODE", True)
         r = client.delete(f"/api/conversations/{cid}", headers={"X-Admin-Token": TOKEN})
