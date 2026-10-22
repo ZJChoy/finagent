@@ -154,9 +154,14 @@ async function openConversation(cid) {
 convListEl.addEventListener("click", async (e) => {
   const del = e.target.dataset.del;
   if (del) {
-    await api("DELETE", "/api/conversations/" + del);
-    if (Number(del) === conversationId) { conversationId = null; messagesEl.innerHTML = ""; }
-    loadConversations();
+    const doDelete = async () => {
+      await api("DELETE", "/api/conversations/" + del);
+      if (Number(del) === conversationId) { conversationId = null; messagesEl.innerHTML = ""; }
+      loadConversations();
+    };
+    try { await doDelete(); } catch (err) {
+      if (err instanceof AdminRequiredError) await ensureAdminToken(doDelete); else throw err;
+    }
     return;
   }
   const item = e.target.closest(".conv-item");

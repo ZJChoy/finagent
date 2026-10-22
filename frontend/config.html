@@ -106,7 +106,14 @@ document.getElementById("save").onclick = async () => {
     memory_summarize_at: Number(document.getElementById("summarize-at").value) || 12,
     memory_extract_every: Number(document.getElementById("extract-every").value) || 3,
   };
-  const saved = await api("PUT", "/api/config", body);
+  const saveOnce = () => api("PUT", "/api/config", body);
+  let saved;
+  try {
+    saved = await saveOnce();
+  } catch (e) {
+    if (e instanceof AdminRequiredError) { await ensureAdminToken(saveOnce); return; }
+    throw e;
+  }
   await loadConfig();   // 回填被钳制后的值
   const msg = document.getElementById("save-msg");
   if (saved.notices && saved.notices.length) {
@@ -134,23 +141,31 @@ async function loadMemories() {
 document.querySelector("#memories").addEventListener("click", async (e) => {
   const id = e.target.dataset.del;
   if (!id) return;
-  await api("DELETE", "/api/memories/" + id);
-  loadMemories();
+  const del = () => api("DELETE", "/api/memories/" + id).then(loadMemories);
+  try { await del(); } catch (err) {
+    if (err instanceof AdminRequiredError) await ensureAdminToken(del); else throw err;
+  }
 });
 
 document.getElementById("mem-add").onclick = async () => {
   const kind = document.getElementById("mem-kind").value.trim() || "偏好";
   const content = document.getElementById("mem-content").value.trim();
   if (!content) return;
-  await api("POST", "/api/memories", { kind, content });
-  document.getElementById("mem-content").value = "";
-  loadMemories();
+  const add = () => api("POST", "/api/memories", { kind, content }).then(() => {
+    document.getElementById("mem-content").value = "";
+    return loadMemories();
+  });
+  try { await add(); } catch (err) {
+    if (err instanceof AdminRequiredError) await ensureAdminToken(add); else throw err;
+  }
 };
 
 document.getElementById("mem-clear").onclick = async () => {
   if (!confirm("清空全部长期记忆？")) return;
-  await fetch("/api/memories", { method: "DELETE" });
-  loadMemories();
+  const clear = () => api("DELETE", "/api/memories").then(loadMemories);
+  try { await clear(); } catch (err) {
+    if (err instanceof AdminRequiredError) await ensureAdminToken(clear); else throw err;
+  }
 };
 
 async function loadStats() {

@@ -40,15 +40,49 @@ function md(src) {
   return out.join("\n").replace(/\u0000(\d+)\u0000/g, (m, i) => blocks[i]);
 }
 
+/* 变更类接口的管理口令：页面输入一次，存 sessionStorage（关浏览器即失效）。
+   sessionStorage 只防误触不防攻击——与本项目 threat model 一致（见 README 安全节）。 */
+function adminToken() {
+  return sessionStorage.getItem("finagent_admin") || "";
+}
+
+function setAdminToken(t) {
+  sessionStorage.setItem("finagent_admin", t || "");
+}
+
+/* 统一请求封装：变更类方法自动带 X-Admin-Token；403 时提示输入口令。 */
 async function api(method, url, body) {
   const opt = { method, headers: {} };
+  if (["POST", "PUT", "DELETE"].includes(method) && adminToken()) {
+    opt.headers["X-Admin-Token"] = adminToken();
+  }
   if (body !== undefined) {
     opt.headers["Content-Type"] = "application/json";
     opt.body = JSON.stringify(body);
   }
   const r = await fetch(url, opt);
-  if (!r.ok) throw new Error((await r.text()) || r.statusText);
+  if (!r.ok) {
+    let detail = "";
+    try { detail = (await r.json()).detail || ""; } catch (_) { /* 非 JSON 响应 */ }
+    if (r.status === 403) {
+      throw new AdminRequiredError(detail || "需要管理口令");
+    }
+    throw new Error(detail || (await r.text()) || r.statusText);
+  }
   return r.json();
+}
+
+class AdminRequiredError extends Error {
+  constructor(msg) { super(msg); this.name = "AdminRequiredError"; }
+}
+
+/* 403 时弹出就地口令输入（各页面共用）。确认后重试 once。 */
+async function ensureAdminToken(retryFn) {
+  const t = prompt("该操作需要管理口令（.env 里的 ADMIN_TOKEN）：");
+  if (t === null) return false;   // 用户取消
+  setAdminToken(t.trim());
+  if (retryFn) { try { await retryFn(); return true; } catch (e) { alert("失败：" + e.message); } }
+  return true;
 }
 
 function topbar(active) {
