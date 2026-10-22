@@ -60,9 +60,11 @@ def _preflight(query: str) -> dict | None:
         events.append({"type": "citations", "items": citations})
     if not grounding_block:
         grounding_block = (
-            "（系统预取未命中任何资料——可能是问法与原文措辞差异所致。"
-            "请**先调用 search_knowledge 工具换关键词检索**（如拆短查询、换同义词），"
-            "或调用 get_stock_financials 取结构化数据；"
+            "（系统预取未命中任何资料——可能是问法与原文措辞差异所致。请尝试："
+            "① 数值/指标类问题**调用 get_stock_financials**（6 位代码查结构化数据，"
+            "问句含代码时直接用该代码）；"
+            "② 文字类问题调用 **search_knowledge** 换关键词检索（拆短查询、换同义词）；"
+            "③ 涉及数字计算调用 **calculate**。"
             "只有当这些工具也确实取不到依据时，才如实说明未找到依据。不要直接放弃作答。）"
         )
 

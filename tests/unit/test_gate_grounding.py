@@ -22,6 +22,13 @@ class TestGate:
     def test_needs_grounding_false(self):
         assert needs_grounding("你好，今天天气如何") is False
 
+    def test_pure_calculation_exempt(self):
+        """回归（40 题评测 Q27）：纯计算题的依据是用户输入本身，不强制接地。"""
+        assert needs_grounding("计算 65.66 减 68.64 等于多少？") is False
+        assert needs_grounding("0 减 0.5 等于多少") is False
+        # 但涉及公司的计算仍要接地（先取数再算）
+        assert needs_grounding("贵州茅台 2025 年营收减 2024 年营收等于多少") is True
+
     def test_needs_snapshot(self):
         assert needs_snapshot("2025年营业收入") is True
         assert needs_snapshot("讲讲你们怎么做的") is False

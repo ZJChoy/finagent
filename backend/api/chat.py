@@ -66,7 +66,7 @@ def delete_conversation(cid: int, _admin: None = Depends(require_admin)):
 @router.post("/chat")
 def chat(body: ChatIn, request: Request):
     rate_limit(request, "chat")
-    rid = new_request_id()
+    new_request_id()
     t0 = time.time()
     log_event("chat.start", msg_chars=len(body.message), conv=body.conversation_id)
     conv_id = body.conversation_id
