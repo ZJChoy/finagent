@@ -6,15 +6,16 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python\&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/%E5%90%8E%E7%AB%AF-FastAPI%20%2B%20SSE-009688?logo=fastapi\&logoColor=white)
 ![Storage](https://img.shields.io/badge/%E5%AD%98%E5%82%A8-SQLite%20%7C%20MySQL-4479A1?logo=sqlite\&logoColor=white)
-![Tests](https://img.shields.io/badge/%E5%9B%9E%E5%BD%92%E8%AF%84%E6%B5%8B-26%2B13%20%E9%A2%98-3B6D11)
+![CI](https://github.com/ZJChoy/finagent/actions/workflows/ci.yml/badge.svg)
+![Tests](https://img.shields.io/badge/pytest-96%20%E7%94%A8%E4%BE%8B-3B6D11)
 
 单机运行 · 只读公开数据 · 不构成投资建议
 
-📄 深入阅读：[架构说明](docs/architecture.md) · [Prompt 策略](docs/prompt-strategy.md) · [踩坑记录](docs/pitfalls.md) · [评测结果](eval/results.md) · [检索实验](eval/retrieval_report.md) · [运营记录](docs/ops-log.md) · [PRD](PRD.md)
+📄 深入阅读：[架构说明](docs/architecture.md) · [Prompt 策略](docs/prompt-strategy.md) · [踩坑记录](docs/pitfalls.md) · [评测结果](eval/results-m4-notes.md) · [检索实验](eval/retrieval_report.md) · [阈值标定](eval/threshold-report.md) · [混合检索评估](eval/hybrid-report.md) · [改造记录](docs/refactor-log.md) · [运营记录](docs/ops-log.md) · [PRD](PRD.md)
 
-**当前状态**：三容器部署（app / mysql / cloudflared 隧道）；20 题端到端回归评测**自动初判 20/20**；  
-RAG 引用命中率经一轮迭代 **70% → 100%**、拒答准确率 **100%**；检索经 **8 档对比实验**优化（MRR +16%）；  
-首轮**真实用户 30 题公网测试**的 3 项严重缺陷已全部修复（见 [ops-log](docs/ops-log.md)）。
+**当前状态**：三容器部署（app / mysql / cloudflared 隧道）；**40 题端到端评测自动初判 33/40**（20 题旧集沿用历史 20/20；扩集含攻击/边界/回归类，2 个已知边界如实记录，见 [评测记录](eval/results-m4-notes.md)）；  
+**96 个离线单测 + CI**（ruff + pytest，Python 3.11/3.12）；检索经 **8 档对比实验**优化（MRR +16%）+ **相关性阈值标定**；  
+首轮**真实用户 30 题公网测试**的 3 项严重缺陷全部修复（见 [ops-log](docs/ops-log.md)）。
 
 ---
 
@@ -102,22 +103,26 @@ apps/announcement/         # 第二实例：公告问答（证明泛化性，见
 
 需要 Python 3.10+ 和一个阿里云百炼（DashScope）API Key —— 用于**向量化**与**生成回答**。
 
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-
-Copy-Item .env.example .env     # 打开 .env，填入 DASHSCOPE_API_KEY
-
-python scripts\ingest.py --dir data\raw --limit 1   # 先入 1 份验证链路
-python scripts\ingest.py --dir data\raw             # 再入全部 4 份年报
-
-python -m uvicorn backend.main:app --reload
-# 打开 http://127.0.0.1:8000
+```bash
+make bootstrap      # 装锁定依赖 → 入库语料（约 2100 块，少量 embedding 费用）→ 索引体检
+make serve          # 起服务 http://127.0.0.1:8000
 ```
 
-- 仓库附 4 份年报 PDF（茅台、美的 2024 + 2025）；首次入库约 2100 个切块，**产生少量 embedding 费用**；
-- 不填 Key 也能起服务（`/health` 显示 `llm_ready: false`），只是问答与入库不可用。
+（等价的手动步骤：`pip install -r requirements.lock` → 复制 `.env.example` 为 `.env` 填
+`DASHSCOPE_API_KEY` → `python scripts/ingest.py --dir data/raw` → `make serve`。）
+
+- 仓库附 4 份年报 PDF（茅台、美的 2024 + 2025）；
+- 不填 Key 也能起服务（`/health` 显示 `llm_ready: false`），只是问答与入库不可用；
+- **启动自检**：索引与元数据不一致会拒绝启动（fail-closed），配置问题以 JSON 告警到 stderr。
+
+其它常用命令：
+
+```bash
+make test      # 96 个离线单测（不需要 API key，约 2s）
+make lint      # ruff 检查
+make eval      # 40 题端到端评测（需服务在跑）
+make doctor    # 索引一致性体检（含 stale 变体与 --stamp 指纹登记）
+```
 
 ### Docker 一键起（应用 + MySQL）
 
@@ -234,15 +239,19 @@ data/raw/               # 年报 PDF（自行放置，不入库）；index/ 与 
 ## 9. 评测（全部可复跑）
 
 ```bash
-python scripts/eval.py                       # 20 题端到端（需服务先起）
+python scripts/eval.py                       # 40 题端到端（含攻击/边界/回归类；需服务先起）
 python scripts/citation_eval.py              # 13 题 RAG 引用命中率 + 拒答准确率
 python scripts/retrieval_eval.py             # 检索层 8 档对比
+python scripts/threshold_calibrate.py        # 相关性阈值标定（金标分布 vs 噪声分布）
+python scripts/hybrid_eval.py                # 混合检索离线评估（BM25+RRF vs 向量）
+python scripts/index_doctor.py               # 索引一致性体检（--stamp 登记变体指纹）
 docker compose run --rm -e DATA_DIR=data/data-announce -e DB_BACKEND=sqlite app \
   python -m apps.announcement.eval_smoke     # 第二实例 10 题冒烟
 ```
 
 评测纪律：**先冻结配置快照**；金标来自外部权威（年报页码人工核对、注入的故障、
 store 实查的数字）；自动初判只做粗筛，最终判定人工对照。
+改造后的 40 题基线与评测驱动修复的完整过程见 [`eval/results-m4-notes.md`](eval/results-m4-notes.md)。
 
 ## 10. 踩坑与优化（工程复盘精选）
 
@@ -265,12 +274,18 @@ store 实查的数字）；自动初判只做粗筛，最终判定人工对照�
 
 - **检索层**：有些题的正确块进不了候选池（重排只能改善排序，不能创造召回）；
   "沾边相关"会挤掉"有答案的"；单块信息常不足以作答（top-5 无上下文聚合）。
-  未做：混合检索（BM25）、查询分解与多路召回、切块粒度对比。
-- **评测是小样本**：20+13 题，结论作趋势参考；金标块经人工抽查但非全量人工标注。
-- **公网形态**：内网穿透无 SLA、URL 随机、依赖本机在线；变更类接口已加 ADMIN_TOKEN
-  fail-closed，但**不建议把演示隧道长期暴露公网**。
+  混合检索已离线评估：RRF 融合 Pass@5 +15% 但样本不足 + 需 llmctx 口径复测，
+  **暂不上线**（含逐题分析，见 [`eval/hybrid-report.md`](eval/hybrid-report.md)）。
+- **相关性阈值**：金标与噪声的分数分布有重叠——阈值能拦"召回线以下的整题
+  无依据"，拦不住"分数高但不含答案"的块（评测 Q31 人工复核发现一处此类
+  幻觉）；短查询语义分固有偏低，阈值下会误拒（评测 Q26）。
+- **评测是小样本**：40 题（扩集含攻击/边界/回归类），结论作趋势参考；
+  自动初判是粗筛，最终判定需人工对照（Q31 即人工复核抓出的）。
+- **公网形态**：内网穿透无 SLA、URL 随机、依赖本机在线；变更类接口 ADMIN_TOKEN
+  fail-closed + 前端口令流 + DEMO_MODE 只读模式 + 按客户端限流，但
+  **不建议把演示隧道长期暴露公网**。
 - **诊断类数字题**的"两次读数比对"行为尚未稳定触发（Edge 项目）。
-- **本版不做**：扫描件 OCR、PDF 以外格式、向量数据库、LangChain 版对比、多 Agent。
+- **本版不做**：扫描件 OCR、PDF 以外格式、向量数据库、多 Agent。
 
 ## 12. 想快速读懂这个项目？
 
