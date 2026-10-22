@@ -6,11 +6,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from pydantic import BaseModel, Field
 
 from ..config import settings
 from ..rag import ingest, retriever, store
+from .ratelimit import rate_limit
 from .security import require_admin
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
@@ -66,13 +67,17 @@ def delete_doc(name: str, _admin: None = Depends(require_admin)):
 
 
 class SearchIn(BaseModel):
-    query: str
-    top_k: int = 5
+    # 边界护栏：top_k=-1 会让 retrieve 返回近乎全库（切片负索引），
+    # 超大值则放大 embedding 与传输成本；前端本身就是 1~20。
+    query: str = Field(min_length=1, max_length=2000)
+    top_k: int = Field(default=5, ge=1, le=20)
 
 
 @router.post("/search")
-def search(body: SearchIn):
-    """直接测召回（不经过模型）—— 用于调 chunk / top_k 做召回优化对比。"""
+def search(body: SearchIn, request: Request):
+    """直接测召回（不经过模型）—— 用于调 chunk / top_k 做召回优化对比。
+    每次调用消耗一次 embedding，按 IP 限流。"""
+    rate_limit(request, "search", capacity=20, refill_per_sec=0.5)
     hits = retriever.retrieve(body.query, top_k=body.top_k)
     return {
         "query": body.query,

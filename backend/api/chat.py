@@ -7,13 +7,14 @@ from __future__ import annotations
 
 import json
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from .. import db
 from ..agent import loop as agent_loop
 from ..agent import memory
+from .ratelimit import rate_limit
 from .security import require_admin
 
 router = APIRouter(prefix="/api", tags=["chat"])
@@ -61,7 +62,8 @@ def delete_conversation(cid: int, _admin: None = Depends(require_admin)):
 # ---------------------------------------------------------------- 对话
 
 @router.post("/chat")
-def chat(body: ChatIn):
+def chat(body: ChatIn, request: Request):
+    rate_limit(request, "chat")
     conv_id = body.conversation_id
     if not conv_id or not db.conversation_exists(conv_id):
         conv_id = db.create_conversation(body.message[:30])
