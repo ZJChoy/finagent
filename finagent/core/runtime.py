@@ -196,6 +196,7 @@ class AgentEngine:
                         "result": content[:300],
                         "truncated": truncated,
                         "ok": bool(result.get("ok", True)),
+                        "citations": len(result.get("citations") or []),
                     }
                 )
                 yield {"type": "tool_result", "name": name, "content": content[:800], "truncated": truncated}
@@ -217,8 +218,18 @@ class AgentEngine:
                 "message": f"检测到可疑引用：{invalid_citations}（本轮并未检索到这些片段）",
             }
 
-        # 接地校验（应用钩子提供 force 语义）：需要依据却无任何成功工具调用 → 拒答
-        grounded = bool(pre_hits) or bool(snapshot) or any(t.get("ok") for t in trace)
+        # 接地校验（应用钩子提供 force 语义）：需要依据却无任何成功工具调用 → 拒答。
+        # 证据 = 检索/取数类工具的成功调用，且**必须带回引用**（citations）——
+        # "检索了但一无所获"不是依据；calculate 这类算术辅助成败都不算
+        #（实测：算术成功曾骗过本判定放行幻觉）。
+        # 证据性用轻量约定声明：工具名含 search/query/get/fetch/retrieve。
+        _EVIDENCE_HINTS = ("search", "query", "get_", "fetch", "retrieve")
+        grounded = bool(pre_hits) or bool(snapshot) or any(
+            t.get("ok")
+            and (t.get("citations") or 0) > 0
+            and any(h in (t.get("name") or "") for h in _EVIDENCE_HINTS)
+            for t in trace
+        )
         ungrounded = force_grounding and not grounded
         if ungrounded:
             final_text = (

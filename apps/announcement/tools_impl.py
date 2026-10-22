@@ -9,7 +9,7 @@ def query_announcements(query: str, top_k: int = 5) -> dict:
     """检索公告原文片段（含编号上下文与结构化引用）。"""
     hits = retriever.retrieve(query, top_k=top_k)
     if not hits:
-        return {"ok": True, "content": "未检索到相关公告片段。", "citations": []}
+        return {"ok": True, "content": "未检索到相关公告片段。", "citations": []}  # 空结果合法
     return {
         "ok": True,
         "content": retriever.build_context(hits),

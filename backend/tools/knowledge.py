@@ -13,8 +13,10 @@ from .registry import Tool, register
 def _search_knowledge(query: str, top_k: int = 5) -> dict:
     hits = retriever.retrieve(query, top_k=top_k)
     if not hits:
-        return {"content": "知识库中未检索到相关内容（可能尚未入库）。", "citations": []}
+        # 空结果是合法回答（不是失败）：显式 ok=True，但**不带 citations**
+        return {"ok": True, "content": "知识库中未检索到相关内容（可能尚未入库）。", "citations": []}
     return {
+        "ok": True,
         "content": retriever.build_context(hits),
         "citations": retriever.citations_of(hits),
     }

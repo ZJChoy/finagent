@@ -18,7 +18,9 @@ from ..tools import finance
 # 公司映射收敛到 gate.COMPANY_CODE_MAP（唯一定义），避免多处映射漂移
 from .gate import COMPANY_CODE_MAP as _NAME_TO_CODE
 
-_CODE_IN_QUERY = re.compile(r"\b([036]\d{5})\b")
+# ⚠️ 不用 \b：Python 的 \b 是 Unicode 感知的，中文与数字相邻不构成词边界
+#（实测 "查一下600519的营收" 解析不到代码 → 误走兜底路径）。用环视断言代替。
+_CODE_IN_QUERY = re.compile(r"(?<!\d)([036]\d{5})(?!\d)")
 
 # 问句里出现的"公司名"，但语料库没收录 —— 必须显式拒答而不是从无关命中里捞代码
 # （实测踩坑：问"格力电器"→ 第 3 级兜底从美的年报文件名捞出 000333 → 数字全真、主语全错）
@@ -68,7 +70,15 @@ def resolve_symbol(query: str, hits: list[dict]) -> tuple[str | None, str]:
         return None, "未识别"
 
     canon = [name for name, c in _NAME_TO_CODE if c == code]
-    if canon and not any(name in q for name in canon):
+    if not canon:
+        # 映射表之外的公司：文件名/正文的代码不足以证明问句问的就是它
+        #（实测：问"格力"命中伊利年报 → 捞出 000858，数字全真、主语全错）。
+        # 收录范围由 COMPANY_CODE_MAP 唯一定义，表外一律判未收录。
+        return None, (
+            f"查询的公司不在语料库收录范围（检索命中指向 {code}，"
+            "该代码不在已收录公司映射内——实体错配拦截，拒答而非张冠李戴）"
+        )
+    if not any(name in q for name in canon):
         return None, (
             f"查询的公司不在语料库收录范围（检索命中指向 {code}，"
             f"但问句未提及 {canon[0]}——实体错配拦截，拒答而非张冠李戴）"

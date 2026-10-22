@@ -62,7 +62,9 @@ def call(name: str, arguments: dict[str, Any]) -> dict:
     """执行工具，统一把异常转成可读文本（不让异常打断整轮对话）。
 
     返回 {"ok": bool, "content": str, "citations": list}。
-    `ok` 用于上层的**接地校验**：没成功调过任何工具，就不该给出事实性回答。
+    `ok` 用于上层的**接地校验**：契约是「失败必须显式声明成功」——
+    工具不带 ok 字段时默认 False，防止失败结果被当成有效证据
+    （实测：calculate 失败也返回 ok=True，骗过接地判定放行幻觉回答）。
     """
     tool = get(name)
     if tool is None:
@@ -78,5 +80,5 @@ def call(name: str, arguments: dict[str, Any]) -> dict:
             "citations": [],
         }
     result.setdefault("citations", [])
-    result.setdefault("ok", True)
+    result.setdefault("ok", False)
     return result

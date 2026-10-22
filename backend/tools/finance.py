@@ -97,31 +97,32 @@ def _get_stock_financials(symbol: str) -> dict:
 
     code = "".join(ch for ch in str(symbol or "") if ch.isdigit())
     if len(code) != 6:
-        return {"content": f"股票代码格式不对：{symbol}（应为 6 位数字，如 600519）"}
+        return {"ok": False, "content": f"股票代码格式不对：{symbol}（应为 6 位数字，如 600519）"}
 
     # ① 先查缓存 —— 命中时**连 akshare 都不用 import**（那一步本身也有开销）
     hit = _read_cache(code)
     if hit:
         _hits += 1
-        return {"content": hit["content"], "source": hit["source"], "cache": "hit"}
+        return {"ok": True, "content": hit["content"], "source": hit["source"], "cache": "hit"}
 
     _misses += 1
 
     try:
         import akshare as ak  # 延迟导入：未安装时不影响其它工具
     except Exception:
-        return {"content": "未安装 akshare，无法获取实时财务数据。"}
+        return {"ok": False, "content": "未安装 akshare，无法获取实时财务数据。"}
 
     try:
         df = ak.stock_financial_abstract(symbol=code)
     except Exception as e:  # noqa: BLE001
         # ⚠️ 失败**不写缓存** —— 否则一次网络抖动会被固化一整个 TTL
         return {
-            "content": f"获取 {code} 财务数据失败（可能是网络或接口变动）：{type(e).__name__}: {e}"
+            "ok": False,
+            "content": f"获取 {code} 财务数据失败（可能是网络或接口变动）：{type(e).__name__}: {e}",
         }
 
     if df is None or getattr(df, "empty", True):
-        return {"content": f"未取到 {code} 的财务数据。"}
+        return {"ok": False, "content": f"未取到 {code} 的财务数据。"}
 
     cols = list(df.columns)
     label_col = cols[1] if len(cols) > 1 else cols[0]
@@ -154,7 +155,7 @@ def _get_stock_financials(symbol: str) -> dict:
     content = "\n".join(lines)
     source = f"akshare:stock_financial_abstract:{code}"
     _write_cache(code, content, source)
-    return {"content": content, "source": source, "cache": "miss"}
+    return {"ok": True, "content": content, "source": source, "cache": "miss"}
 
 
 def fetch_financials(symbol: str) -> dict:

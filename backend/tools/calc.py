@@ -35,24 +35,30 @@ def _eval(node: ast.AST) -> float:
 def _format_number(value: float) -> str:
     """大数不用科学计数法输出：模型会原样引用字符串，必须可读。
     整数结果给千分位整数；非整数 round 6 位后取最短往返表示——
-    :f 会在大数值上带出浮点尾差（如 172054171890.91 → ...910004）。"""
+    :f 会在大数值上带出浮点尾差（如 172054171890.91 → ...910004）。
+
+    ⚠️ 负数先取绝对值格式化再补符号：(-1, 0) 区间的整数部分是 "-0"，
+    int("-0") == 0 会丢掉负号（实测 -0.5 → "0.5"，模型照抄成"上升 0.5%"）。"""
     if value != value or value in (float("inf"), float("-inf")):
         return str(value)
+    sign = "-" if value < 0 else ""
+    value = abs(value)
     if value == int(value):
-        return f"{int(value):,}"
+        return f"{sign}{int(value):,}"
     text = repr(round(value, 6))
-    if "e" in text or "E" in text:  # 极小值（<1e-4）repr 会用科学计数法
-        text = f"{value:.6f}".rstrip("0").rstrip(".")
+    if "e" in text or "E" in text:
+        # 极小值（round 6 位后归零，repr 出科学计数法）：定点展开保留量级
+        text = f"{value:.16f}".rstrip("0")
     whole, _, frac = text.partition(".")
-    return f"{int(whole):,}" + ("." + frac if frac else "")
+    return f"{sign}{int(whole):,}" + ("." + frac if frac else "")
 
 
 def _calculate(expression: str) -> dict:
     try:
         value = _eval(ast.parse(expression.strip(), mode="eval").body)
-        return {"content": f"{expression} = {_format_number(value)}"}
+        return {"ok": True, "content": f"{expression} = {_format_number(value)}"}
     except Exception as e:  # noqa: BLE001
-        return {"content": f"计算失败：{e}"}
+        return {"ok": False, "content": f"计算失败：{e}"}
 
 
 register(
