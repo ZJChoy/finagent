@@ -129,6 +129,8 @@ def build() -> None:
     arr = np.asarray(vecs, dtype=np.float32)
     out = store.INDEX_DIR / "vectors_ctx.npy"
     np.save(out, arr)
+    # 登记指纹：变体行数与 row_id 必须和当前 base 完全对齐，否则检索时被判 stale 回退 base
+    store._write_variant_fingerprint(out.name, store._base_fingerprint())
     print(f"已写入 {out}  形状 {arr.shape}")
 
 
@@ -229,6 +231,8 @@ def build_llm(batch: int = 10) -> None:
     vecs = embedder.embed_texts(texts, batch=16)
     out = store.INDEX_DIR / "vectors_llmctx.npy"
     np.save(out, np.asarray(vecs, dtype=np.float32))
+    # 登记指纹：变体行数与 row_id 必须和当前 base 完全对齐，否则检索时被判 stale 回退 base
+    store._write_variant_fingerprint(out.name, store._base_fingerprint())
     print(f"已写入 {out} 形状 {np.asarray(vecs).shape}")
 
 

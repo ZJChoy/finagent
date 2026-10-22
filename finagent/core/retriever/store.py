@@ -18,6 +18,7 @@
 """
 from __future__ import annotations
 
+import json
 import time
 from pathlib import Path
 from typing import Any
@@ -46,11 +47,98 @@ VARIANTS: dict[str, str] = {
 }
 
 
+def _base_fingerprint() -> str:
+    """base 索引的内容指纹：行数 + 所有 row_id。变体与 base 的指纹一致才算有效。
+
+    只用行数会漏掉「行数巧合但内容错位」（如 reset 后重建，行数恰好相同），
+    row_id 列表能区分"同一批切块"与"不同的切块"。
+    """
+    ids = [int(r["row_id"]) for r in settings.dbconn.query(
+        "SELECT row_id FROM rag_chunks ORDER BY row_id")]
+    return f"{len(ids)}:{','.join(map(str, ids))}"
+
+
+def _fingerprint_path(variant_fname: str) -> Path:
+    return INDEX_DIR / (variant_fname + ".fp")
+
+
+def _read_variant_fingerprint(variant_fname: str) -> str | None:
+    p = _fingerprint_path(variant_fname)
+    if not p.exists():
+        return None
+    try:
+        return json.loads(p.read_text(encoding="utf-8")).get("fingerprint")
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _write_variant_fingerprint(variant_fname: str, fingerprint: str) -> None:
+    _fingerprint_path(variant_fname).write_text(
+        json.dumps({"fingerprint": fingerprint}, ensure_ascii=False), encoding="utf-8")
+
+
+def _variant_matches_base(variant_fname: str) -> bool:
+    """变体文件存在、行数与元数据一致、且指纹与当前 base 相同 → 有效。"""
+    p = INDEX_DIR / variant_fname
+    if not p.exists():
+        return False
+    meta_rows = count()
+    try:
+        if np.load(p, mmap_mode="r").shape[0] != meta_rows:
+            return False
+    except Exception:  # noqa: BLE001
+        return False
+    return _read_variant_fingerprint(variant_fname) == _base_fingerprint()
+
+
 def active_vector_path() -> Path:
-    """当前生效的向量文件；对应变体不存在时退回 base。"""
+    """当前生效的向量文件；对应变体不存在、行数不符或**指纹过期**时退回 base。
+
+    变体失效不自动重建（重建要逐块调 LLM，成本高、失败面大），而是回退 base
+    并在 index_health() 里暴露 stale 状态——检索质量可以退化，
+    向量与文本错位（静默答错）绝不能发生。
+    """
     name = VARIANTS.get(settings.RETRIEVAL_INDEX, VARIANTS["base"])
-    path = INDEX_DIR / name
-    return path if path.exists() else VEC_PATH
+    if name == VARIANTS["base"]:
+        return VEC_PATH
+    if _variant_matches_base(name):
+        return INDEX_DIR / name
+    return VEC_PATH
+
+
+def index_health() -> dict:
+    """索引一致性事实，供 /health 与启动自检使用。"""
+    meta_rows = count()
+    base_rows = 0
+    if VEC_PATH.exists():
+        try:
+            base_rows = int(np.load(VEC_PATH, mmap_mode="r").shape[0])
+        except Exception:  # noqa: BLE001
+            base_rows = -1
+    stale: list[str] = []
+    variants: dict[str, int] = {}
+    for name, fname in VARIANTS.items():
+        if name == "base":
+            continue
+        p = INDEX_DIR / fname
+        if not p.exists():
+            continue
+        try:
+            rows = int(np.load(p, mmap_mode="r").shape[0])
+        except Exception:  # noqa: BLE001
+            rows = -1
+        variants[name] = rows
+        if not _variant_matches_base(fname):
+            stale.append(name)
+    return {
+        "meta_rows": meta_rows,
+        "base_rows": base_rows,
+        "consistent": meta_rows == base_rows,
+        "active_variant": "base" if active_vector_path() == VEC_PATH
+        else settings.RETRIEVAL_INDEX,
+        "variant_rows": variants,
+        "stale_variants": stale,
+    }
 
 _SCHEMA = f"""
 CREATE TABLE IF NOT EXISTS rag_documents (

@@ -42,6 +42,7 @@ def health():
         "db": dbconn.DIALECT,
         "db_ok": ping.get("ok"),
         "retrieval_index": store.active_vector_path().name,
+        "index": store.index_health(),   # 行数一致性与 stale 变体（错位 = 必须重建）
         "rerank": settings.RERANK_ENABLED,
     }
 
