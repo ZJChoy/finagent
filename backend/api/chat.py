@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import time
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
@@ -15,6 +16,7 @@ from .. import db
 from ..agent import loop as agent_loop
 from ..agent import memory
 from .ratelimit import rate_limit
+from .requestlog import log_event, new_request_id
 from .security import require_admin
 
 router = APIRouter(prefix="/api", tags=["chat"])
@@ -64,6 +66,9 @@ def delete_conversation(cid: int, _admin: None = Depends(require_admin)):
 @router.post("/chat")
 def chat(body: ChatIn, request: Request):
     rate_limit(request, "chat")
+    rid = new_request_id()
+    t0 = time.time()
+    log_event("chat.start", msg_chars=len(body.message), conv=body.conversation_id)
     conv_id = body.conversation_id
     if not conv_id or not db.conversation_exists(conv_id):
         conv_id = db.create_conversation(body.message[:30])
@@ -91,8 +96,12 @@ def chat(body: ChatIn, request: Request):
             ):
                 if ev["type"] == "end":
                     done = ev
+                elif ev["type"] == "tool_call":
+                    log_event("chat.tool_call", tool=ev.get("name"))
                 yield _sse(ev)
         except Exception as e:  # noqa: BLE001
+            log_event("chat.error", level="ERROR",
+                      error=type(e).__name__, detail=str(e)[:200])
             yield _sse({"type": "error", "message": f"{type(e).__name__}: {e}"})
             return
 
@@ -108,5 +117,13 @@ def chat(body: ChatIn, request: Request):
             )
         memory.maybe_summarize(conv_id)
         memory.maybe_extract(conv_id)
+        u = (done or {}).get("usage") or {}
+        log_event("chat.done",
+                  conv=conv_id,
+                  latency_ms=int((time.time() - t0) * 1000),
+                  tokens=u.get("total_tokens", 0),
+                  citations=len((done or {}).get("citations") or []),
+                  tool_calls=len((done or {}).get("tool_calls") or []),
+                  ungrounded=bool((done or {}).get("ungrounded")))
 
     return StreamingResponse(gen(), media_type="text/event-stream")
